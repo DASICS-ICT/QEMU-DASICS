@@ -476,7 +476,7 @@
 #define PGSHIFT             12
 
 /* Default Reset Vector adress */
-#define DEFAULT_RSTVEC      0x1000
+#define DEFAULT_RSTVEC      0x10000
 
 /* Exception causes */
 #define EXCP_NONE                          -1 /* sentinel value */
