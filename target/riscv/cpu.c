@@ -62,7 +62,21 @@ const char * const riscv_excp_names[] = {
     "exec_page_fault",
     "load_page_fault",
     "reserved",
-    "store_page_fault"
+    "store_page_fault",
+    "reserved",
+    "reserved",
+    "reserved",
+    "reserved",
+    "reserved",
+    "reserved",
+    "reserved",
+    "reserved",
+    "dasics_user_fault_fetch",
+    "dasics_supervisor_fault_fetch",
+    "dasics_user_fault_load",
+    "dasics_supervisor_fault_load",
+    "dasics_user_fault_store",
+    "dasics_supervisor_fault_store"
 };
 
 const char * const riscv_intr_names[] = {
@@ -154,7 +168,7 @@ static void rv32imacu_nommu_cpu_init(Object *obj)
 
 #elif defined(TARGET_RISCV64)
 
-static void riscv_base64_cpu_init(Object *obj)
+static void riscv_base64_cpu_init(Object *obj)  // VIRT_CPU
 {
     CPURISCVState *env = &RISCV_CPU(obj)->env;
     /* We set this in the realise function */
@@ -352,6 +366,10 @@ static void riscv_cpu_realize(DeviceState *dev, Error **errp)
         set_feature(env, RISCV_FEATURE_PMP);
     }
 
+    if (cpu->cfg.dasics) {
+        set_feature(env, RISCV_FEATURE_DASICS);
+    }
+
     /* If misa isn't set (rv32 and rv64 machines) set it here */
     if (!env->misa) {
         /* Do some ISA extension error checking */
@@ -406,6 +424,9 @@ static void riscv_cpu_realize(DeviceState *dev, Error **errp)
         if (cpu->cfg.ext_u) {
             target_misa |= RVU;
         }
+        if (cpu->cfg.ext_n) {
+            target_misa |= RVN;
+        }
 
         set_misa(env, RVXLEN | target_misa);
     }
@@ -441,12 +462,14 @@ static Property riscv_cpu_properties[] = {
     DEFINE_PROP_BOOL("c", RISCVCPU, cfg.ext_c, true),
     DEFINE_PROP_BOOL("s", RISCVCPU, cfg.ext_s, true),
     DEFINE_PROP_BOOL("u", RISCVCPU, cfg.ext_u, true),
+    DEFINE_PROP_BOOL("n", RISCVCPU, cfg.ext_n, true),
     DEFINE_PROP_BOOL("Counters", RISCVCPU, cfg.ext_counters, true),
     DEFINE_PROP_BOOL("Zifencei", RISCVCPU, cfg.ext_ifencei, true),
     DEFINE_PROP_BOOL("Zicsr", RISCVCPU, cfg.ext_icsr, true),
     DEFINE_PROP_STRING("priv_spec", RISCVCPU, cfg.priv_spec),
     DEFINE_PROP_BOOL("mmu", RISCVCPU, cfg.mmu, true),
     DEFINE_PROP_BOOL("pmp", RISCVCPU, cfg.pmp, true),
+    DEFINE_PROP_BOOL("dasics", RISCVCPU, cfg.dasics, true),
     DEFINE_PROP_END_OF_LIST(),
 };
 

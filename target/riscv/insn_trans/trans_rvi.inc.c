@@ -142,6 +142,10 @@ static bool gen_load(DisasContext *ctx, arg_lb *a, TCGMemOp memop)
     gen_get_gpr(t0, a->rs1);
     tcg_gen_addi_tl(t0, t0, a->imm);
 
+#ifndef CONFIG_USER_ONLY
+    gen_helper_dasics_ld_check(cpu_env, t0, tcg_const_i64(ctx->base.pc_next));
+#endif
+
     tcg_gen_qemu_ld_tl(t1, t0, ctx->mem_idx, memop);
     gen_set_gpr(a->rd, t1);
     tcg_temp_free(t0);
@@ -181,6 +185,10 @@ static bool gen_store(DisasContext *ctx, arg_sb *a, TCGMemOp memop)
     gen_get_gpr(t0, a->rs1);
     tcg_gen_addi_tl(t0, t0, a->imm);
     gen_get_gpr(dat, a->rs2);
+
+#ifndef CONFIG_USER_ONLY
+    gen_helper_dasics_st_check(cpu_env, t0, tcg_const_i64(ctx->base.pc_next));
+#endif
 
     tcg_gen_qemu_st_tl(dat, t0, ctx->mem_idx, memop);
     tcg_temp_free(t0);

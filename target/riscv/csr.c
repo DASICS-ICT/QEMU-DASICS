@@ -98,9 +98,19 @@ static int smode(CPURISCVState *env, int csrno)
     return -!riscv_has_ext(env, RVS);
 }
 
+static int uli(CPURISCVState *env, int csrno)
+{
+    return -!riscv_has_ext(env, RVN);
+}
+
 static int pmp(CPURISCVState *env, int csrno)
 {
     return -!riscv_feature(env, RISCV_FEATURE_PMP);
+}
+
+static int dasics(CPURISCVState *env, int csrno)
+{
+    return -!riscv_feature(env, RISCV_FEATURE_DASICS);
 }
 #endif
 
@@ -228,9 +238,10 @@ static int read_timeh(CPURISCVState *env, int csrno, target_ulong *val)
 
 #define M_MODE_INTERRUPTS (MIP_MSIP | MIP_MTIP | MIP_MEIP)
 #define S_MODE_INTERRUPTS (MIP_SSIP | MIP_STIP | MIP_SEIP)
+#define U_MODE_INTERRUPTS (MIP_USIP | MIP_UTIP | MIP_UEIP)
 
-static const target_ulong delegable_ints = S_MODE_INTERRUPTS;
-static const target_ulong all_ints = M_MODE_INTERRUPTS | S_MODE_INTERRUPTS;
+static const target_ulong delegable_ints = S_MODE_INTERRUPTS | U_MODE_INTERRUPTS;
+static const target_ulong all_ints = M_MODE_INTERRUPTS | S_MODE_INTERRUPTS | U_MODE_INTERRUPTS;
 static const target_ulong delegable_excps =
     (1ULL << (RISCV_EXCP_INST_ADDR_MIS)) |
     (1ULL << (RISCV_EXCP_INST_ACCESS_FAULT)) |
@@ -246,14 +257,23 @@ static const target_ulong delegable_excps =
     (1ULL << (RISCV_EXCP_M_ECALL)) |
     (1ULL << (RISCV_EXCP_INST_PAGE_FAULT)) |
     (1ULL << (RISCV_EXCP_LOAD_PAGE_FAULT)) |
-    (1ULL << (RISCV_EXCP_STORE_PAGE_FAULT));
+    (1ULL << (RISCV_EXCP_STORE_PAGE_FAULT)) |
+    (1ULL << (RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT)) |
+    (1ULL << (RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT)) |
+    (1ULL << (RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT)) |
+    (1ULL << (RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT)) |
+    (1ULL << (RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT)) |
+    (1ULL << (RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT));
 static const target_ulong sstatus_v1_9_mask = SSTATUS_SIE | SSTATUS_SPIE |
     SSTATUS_UIE | SSTATUS_UPIE | SSTATUS_SPP | SSTATUS_FS | SSTATUS_XS |
     SSTATUS_SUM | SSTATUS_SD;
 static const target_ulong sstatus_v1_10_mask = SSTATUS_SIE | SSTATUS_SPIE |
     SSTATUS_UIE | SSTATUS_UPIE | SSTATUS_SPP | SSTATUS_FS | SSTATUS_XS |
     SSTATUS_SUM | SSTATUS_MXR | SSTATUS_SD;
-static const target_ulong sip_writable_mask = SIP_SSIP | MIP_USIP | MIP_UEIP;
+static const target_ulong sip_writable_mask = SIP_SSIP | MIP_USIP | MIP_UEIP | MIP_UTIP;
+
+static const target_ulong ustatus_mask = USTATUS_UIE | USTATUS_UPIE;
+static const target_ulong uip_writable_mask = UIP_USIP;
 
 #if defined(TARGET_RISCV32)
 static const char valid_vm_1_09[16] = {
@@ -314,9 +334,9 @@ static int write_mstatus(CPURISCVState *env, int csrno, target_ulong val)
                 MSTATUS_MPRV | MSTATUS_SUM | MSTATUS_VM)) {
             tlb_flush(env_cpu(env));
         }
-        mask = MSTATUS_SIE | MSTATUS_SPIE | MSTATUS_MIE | MSTATUS_MPIE |
-            MSTATUS_SPP | MSTATUS_FS | MSTATUS_MPRV | MSTATUS_SUM |
-            MSTATUS_MPP | MSTATUS_MXR |
+        mask = MSTATUS_UIE | MSTATUS_UPIE | MSTATUS_SIE | MSTATUS_SPIE |
+            MSTATUS_MIE | MSTATUS_MPIE | MSTATUS_SPP | MSTATUS_FS |
+            MSTATUS_MPRV | MSTATUS_SUM | MSTATUS_MPP | MSTATUS_MXR |
             (validate_vm(env, get_field(val, MSTATUS_VM)) ?
                 MSTATUS_VM : 0);
     }
@@ -325,10 +345,10 @@ static int write_mstatus(CPURISCVState *env, int csrno, target_ulong val)
                 MSTATUS_MPRV | MSTATUS_SUM)) {
             tlb_flush(env_cpu(env));
         }
-        mask = MSTATUS_SIE | MSTATUS_SPIE | MSTATUS_MIE | MSTATUS_MPIE |
-            MSTATUS_SPP | MSTATUS_FS | MSTATUS_MPRV | MSTATUS_SUM |
-            MSTATUS_MPP | MSTATUS_MXR | MSTATUS_TVM | MSTATUS_TSR |
-            MSTATUS_TW;
+        mask = MSTATUS_UIE | MSTATUS_UPIE | MSTATUS_SIE | MSTATUS_SPIE |
+            MSTATUS_MIE | MSTATUS_MPIE | MSTATUS_SPP | MSTATUS_FS |
+            MSTATUS_MPRV | MSTATUS_SUM | MSTATUS_MPP | MSTATUS_MXR |
+            MSTATUS_TVM | MSTATUS_TSR | MSTATUS_TW;
 #if defined(TARGET_RISCV64)
             /*
              * RV32: MPV and MTL are not in mstatus. The current plan is to
@@ -379,7 +399,7 @@ static int write_misa(CPURISCVState *env, int csrno, target_ulong val)
     val &= env->misa_mask;
 
     /* Mask extensions that are not supported by QEMU */
-    val &= (RVI | RVE | RVM | RVA | RVF | RVD | RVC | RVS | RVU);
+    val &= (RVI | RVE | RVM | RVA | RVF | RVD | RVC | RVS | RVU | RVN);
 
     /* 'D' depends on 'F', so clear 'D' if 'F' is not present */
     if ((val & RVD) && !(val & RVF)) {
@@ -604,6 +624,36 @@ static int write_sstatus(CPURISCVState *env, int csrno, target_ulong val)
     return write_mstatus(env, CSR_MSTATUS, newval);
 }
 
+static int read_sedeleg(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->sedeleg;
+    return 0;
+}
+
+static int write_sedeleg(CPURISCVState *env, int csrno, target_ulong val)
+{
+    // v1.1: Only bits corresponding to traps that have been delegated to S-mode
+    //  are writable; the others are hardwired to zero
+    // XXX: What if medeleg/mideleg is changed?
+    env->sedeleg = val & env->medeleg;
+    return 0;
+}
+
+static int read_sideleg(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->sideleg;
+    return 0;
+}
+
+static int write_sideleg(CPURISCVState *env, int csrno, target_ulong val)
+{
+    // v1.1: Only bits corresponding to traps that have been delegated to S-mode
+    //  are writable; the others are hardwired to zero
+    // XXX: What if medeleg/mideleg is changed?
+    env->sideleg = val & env->mideleg;
+    return 0;
+}
+
 static int read_sie(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->mie & env->mideleg;
@@ -612,7 +662,8 @@ static int read_sie(CPURISCVState *env, int csrno, target_ulong *val)
 
 static int write_sie(CPURISCVState *env, int csrno, target_ulong val)
 {
-    target_ulong newval = (env->mie & ~env->mideleg) | (val & env->mideleg);
+    target_ulong newval = (env->mie & ~S_MODE_INTERRUPTS) |
+                          (val & (S_MODE_INTERRUPTS | U_MODE_INTERRUPTS));
     return write_mie(env, CSR_MIE, newval);
 }
 
@@ -752,6 +803,107 @@ static int write_satp(CPURISCVState *env, int csrno, target_ulong val)
     return 0;
 }
 
+/* User Trap Setup */
+static int read_ustatus(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mstatus & ustatus_mask;
+    return 0;
+}
+
+static int write_ustatus(CPURISCVState *env, int csrno, target_ulong val)
+{
+    target_ulong newval = (env->mstatus & ~ustatus_mask) | (val & ustatus_mask);
+    return write_mstatus(env, CSR_MSTATUS, newval);
+}
+
+static int read_uie(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mie & env->sideleg;
+    return 0;
+}
+
+static int write_uie(CPURISCVState *env, int csrno, target_ulong val)
+{
+    target_ulong newval = (env->mie & ~U_MODE_INTERRUPTS) |
+                          (val & U_MODE_INTERRUPTS);
+    return write_mie(env, CSR_MIE, newval);
+}
+
+static int read_utvec(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->utvec;
+    return 0;
+}
+
+static int write_utvec(CPURISCVState *env, int csrno, target_ulong val)
+{
+    /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
+    if ((val & 3) < 2) {
+        env->utvec = val;
+    } else {
+        qemu_log_mask(LOG_UNIMP, "CSR_UTVEC: reserved mode not supported\n");
+    }
+    return 0;
+}
+
+/* User Trap Handling */
+static int read_uscratch(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->uscratch;
+    return 0;
+}
+
+static int write_uscratch(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->uscratch = val;
+    return 0;
+}
+
+static int read_uepc(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->uepc;
+    return 0;
+}
+
+static int write_uepc(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->uepc = val;
+    return 0;
+}
+
+static int read_ucause(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->ucause;
+    return 0;
+}
+
+static int write_ucause(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->ucause = val;
+    return 0;
+}
+
+static int read_utval(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->utval;
+    return 0;
+}
+
+static int write_utval(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->utval = val;
+    return 0;
+}
+
+static int rmw_uip(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                   target_ulong new_value, target_ulong write_mask)
+{
+    int ret = rmw_mip(env, CSR_MSTATUS, ret_value, new_value,
+                      write_mask & env->sideleg & sip_writable_mask);
+    *ret_value &= env->sideleg;
+    return ret;
+}
+
 /* Physical Memory Protection */
 static int read_pmpcfg(CPURISCVState *env, int csrno, target_ulong *val)
 {
@@ -777,6 +929,250 @@ static int write_pmpaddr(CPURISCVState *env, int csrno, target_ulong val)
     return 0;
 }
 
+/* DASICS Protection Mechanism */
+static int read_dmaincall(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->dasics_state.dmaincall;
+    return 0;
+}
+
+static int write_dmaincall(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->dasics_state.dmaincall = val;
+    return 0;
+}
+
+static int read_dretpc(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->dasics_state.dretpc;
+    return 0;
+}
+
+static int write_dretpc(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->dasics_state.dretpc = val;
+    return 0;
+}
+
+static int read_dretpcfz(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->dasics_state.dretpcfz;
+    return 0;
+}
+
+static int write_dretpcfz(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->dasics_state.dretpcfz = val;
+    return 0;
+}
+
+static int read_dlcfg(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    int idx = csrno - CSR_DLCFG0;
+
+    if (0 <= idx && idx <= (MAX_DASICS_LIBBOUNDS >> 3)) {
+#if defined(TARGET_RISCV32)
+        uint32_t step = 4;  // RV32
+#else
+        uint32_t step = 8;  // RV64
+#endif
+        target_ulong cfgval = 0;
+
+        // Each libcfg contains 8 tiny configs
+        for (int i = 0; i < 8; ++i) {
+            cfgval = env->dasics_state.libcfg[(idx << 3) + i] & LIBCFG_MASK;
+            *val |= (cfgval << (i * step));
+        }
+    } else {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "Ignoring dlcfg read: Out of range! csrno = %d\n", csrno);
+    }
+
+    return 0;
+}
+
+static int write_dlcfg(CPURISCVState *env, int csrno, target_ulong val)
+{
+    int idx = csrno - CSR_DLCFG0;
+
+    if (0 <= idx && idx <= (MAX_DASICS_LIBBOUNDS >> 3)) {
+#if defined(TARGET_RISCV32)
+        uint32_t step = 4;  // RV32
+#else
+        uint32_t step = 8;  // RV64
+#endif
+        uint8_t cfgval = 0;
+
+        // Each libcfg contains 8 tiny configs
+        for (int i = 0; i < 8; ++i) {
+            cfgval = (val >> (step * i)) & LIBCFG_MASK;
+            env->dasics_state.libcfg[(idx << 3) + i] = cfgval;
+        }
+    } else {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "Ignoring dlcfg write: Out of range! csrno = %d\n", csrno);
+    }
+
+    return 0;
+}
+
+static int read_dlbound(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    int idx = csrno - CSR_DLBOUND0;
+
+    if (0 <= idx && idx < (MAX_DASICS_LIBBOUNDS << 1)) {
+        *val = !(idx & 0x1) ? env->dasics_state.libbound[idx >> 1].hi:
+                              env->dasics_state.libbound[idx >> 1].lo;
+    } else {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                "Ignoring dlbound read: Out of range! csrno = %d\n", csrno);
+    }
+
+    return 0;
+}
+
+static int write_dlbound(CPURISCVState *env, int csrno, target_ulong val)
+{
+    int idx = csrno - CSR_DLBOUND0;
+
+    if (0 <= idx && idx < (MAX_DASICS_LIBBOUNDS << 1)) {
+        if (!(idx & 0x1)) {
+            env->dasics_state.libbound[idx >> 1].hi = val;
+        } else {
+            env->dasics_state.libbound[idx >> 1].lo = val;
+        }
+    } else {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                "Ignoring dlbound write: Out of range! csrno = %d\n", csrno);
+    }
+
+    return 0;
+}
+
+static int read_dsmbound(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    switch(csrno) {
+    case CSR_DSMBOUND0:
+        *val = env->dasics_state.smbound.hi;
+        break;
+    case CSR_DSMBOUND1:
+        *val = env->dasics_state.smbound.lo;
+        break;
+    default:
+        qemu_log_mask(LOG_GUEST_ERROR, \
+            "Ignoring dsmbound read: Out of range! csrno = %d\n", csrno);
+        break;
+    }
+
+    return 0;
+}
+
+static int write_dsmbound(CPURISCVState *env, int csrno, target_ulong val)
+{
+    switch(csrno) {
+    case CSR_DSMBOUND0:
+        env->dasics_state.smbound.hi = val;
+        break;
+    case CSR_DSMBOUND1:
+        env->dasics_state.smbound.lo = val;
+        break;
+    default:
+        qemu_log_mask(LOG_GUEST_ERROR, \
+            "Ignoring dsmbound write: Out of range! csrno = %d\n", csrno);
+        break;
+    }
+
+    return 0;
+}
+
+static int read_dumbound(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    switch(csrno) {
+    case CSR_DUMBOUND0:
+        *val = env->dasics_state.umbound.hi;
+        break;
+    case CSR_DUMBOUND1:
+        *val = env->dasics_state.umbound.lo;
+        break;
+    default:
+        qemu_log_mask(LOG_GUEST_ERROR, \
+            "Ignoring dumbound read: Out of range! csrno = %d\n", csrno);
+        break;
+    }
+
+    return 0;
+}
+
+static int write_dumbound(CPURISCVState *env, int csrno, target_ulong val)
+{
+    switch(csrno) {
+    case CSR_DUMBOUND0:
+        env->dasics_state.umbound.hi = val;
+        break;
+    case CSR_DUMBOUND1:
+        env->dasics_state.umbound.lo = val;
+        break;
+    default:
+        qemu_log_mask(LOG_GUEST_ERROR, \
+            "Ignoring dumbound write: Out of range! csrno = %d\n", csrno);
+        break;
+    }
+
+    return 0;
+}
+
+static int read_dsmcfg(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->dasics_state.maincfg & SMCFG_MASK;
+    return 0;
+}
+
+static int write_dsmcfg(CPURISCVState *env, int csrno, target_ulong val)
+{
+    // Perform CLS logic of dsmcfg first
+    bool val_scls = (val & MCFG_SCLS) != 0;
+    bool val_ucls = (val & MCFG_UCLS) != 0;
+
+    if (val_scls) {
+        write_dmbound(env, CSR_DUMBOUND0, 0);
+        write_dmbound(env, CSR_DUMBOUND1, 0);
+    }
+
+    if (val_scls || val_ucls) {
+        for (int i = 0; i < (MAX_DASICS_LIBBOUNDS >> 3); ++i) {
+            write_dlcfg(env, CSR_DLCFG0 + i, 0);
+        }
+        for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
+            write_dlbound(env, CSR_DLBOUND0 + (i << 1), 0);
+            write_dlbound(env, CSR_DLBOUND1 + (i << 1), 0);
+        }
+
+        write_dmaincall(env, CSR_DMAINCALL, 0);
+        write_dretpc(env, CSR_DRETPC, 0);
+        write_dretpcfz(env, CSR_DRETPCFZ, 0);
+    }
+
+    // Then update dsmcfg itself. CLS bit has already taken effect, thus set to 0
+    target_ulong mask = (csrno == CSR_DSMCFG) ? SMCFG_MASK : UMCFG_MASK;
+    env->dasics_state.maincfg = (env->dasics_state.maincfg & ~mask) |
+                                (val & ~MCFG_SCLS & ~MCFG_UCLS & mask);
+
+    return 0;
+}
+
+static int read_dumcfg(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->dasics_state.maincfg & UMCFG_MASK;
+    return 0;
+}
+
+static int write_dumcfg(CPURISCVState *env, int csrno, target_ulong val)
+{
+    target_ulong newval = (env->dasics_state.maincfg & ~UMCFG_MASK) |
+                          (val & UMCFG_MASK);
+    return write_dsmcfg(env, CSR_DSMCFG, newval);
+}
+
 #endif
 
 /*
@@ -799,7 +1195,12 @@ int riscv_csrrw(CPURISCVState *env, int csrno, target_ulong *ret_value,
 #if !defined(CONFIG_USER_ONLY)
     int csr_priv = get_field(csrno, 0x300);
     int read_only = get_field(csrno, 0xC00) == 3;
-    if ((write_mask && read_only) || (env->priv < csr_priv)) {
+
+    if (!(env->priv >= csr_priv && dasics_in_trusted_zone(env))) {
+        return -1;
+    }
+
+    if (write_mask && read_only) {
         return -1;
     }
 #endif
@@ -928,6 +1329,8 @@ static riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
 
     /* Supervisor Trap Setup */
     [CSR_SSTATUS] =             { smode, read_sstatus,     write_sstatus     },
+    [CSR_SEDELEG] =             { smode, read_sedeleg,     write_sedeleg     },
+    [CSR_SIDELEG] =             { smode, read_sideleg,     write_sideleg     },
     [CSR_SIE] =                 { smode, read_sie,         write_sie         },
     [CSR_STVEC] =               { smode, read_stvec,       write_stvec       },
     [CSR_SCOUNTEREN] =          { smode, read_scounteren,  write_scounteren  },
@@ -942,9 +1345,29 @@ static riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     /* Supervisor Protection and Translation */
     [CSR_SATP] =                { smode, read_satp,        write_satp        },
 
+    /* User Trap Setup */
+    [CSR_USTATUS] =             { uli, read_ustatus,      write_ustatus      },
+    [CSR_UIE] =                 { uli, read_uie,          write_uie          },
+    [CSR_UTVEC] =               { uli, read_utvec,        write_utvec        },
+
+    /* User Trap Handling */
+    [CSR_USCRATCH] =            {uli, read_uscratch,      write_uscratch     },
+    [CSR_UEPC] =                {uli, read_uepc,          write_uepc         },
+    [CSR_UCAUSE] =              {uli, read_ucause,        write_ucause       },
+    [CSR_UTVAL] =               {uli, read_utval,         write_utval        },
+    [CSR_UIP] =                 {uli, NULL,        NULL,    rmw_uip},
+
     /* Physical Memory Protection */
     [CSR_PMPCFG0  ... CSR_PMPADDR9] =  { pmp,   read_pmpcfg,  write_pmpcfg   },
     [CSR_PMPADDR0 ... CSR_PMPADDR15] = { pmp,   read_pmpaddr, write_pmpaddr  },
+
+    /* DASICS Protection Mechanism */
+    [CSR_DSMCFG] =                      { dasics, read_dsmcfg,   write_dsmcfg  },
+    [CSR_DSMBOUND0 ... CSR_DSMBOUND1] = { dasics, read_dsmbound, write_dsmbound},
+    [CSR_DUMCFG] =                      { dasics, read_dumcfg,   write_dumcfg  },
+    [CSR_DUMBOUND0 ... CSR_DUMBOUND1] = { dasics, read_dumbound, write_dumbound},
+    [CSR_DLCFG0 ... CSR_DLCFG1] =       { dasics, read_dlcfg,    write_dlcfg   },
+    [CSR_DLBOUND0 ... CSR_DLBOUND31] =  { dasics, read_dlbound,  write_dlbound },
 
     /* Performance Counters */
     [CSR_HPMCOUNTER3   ... CSR_HPMCOUNTER31] =    { ctr,  read_zero          },

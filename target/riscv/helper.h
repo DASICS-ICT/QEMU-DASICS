@@ -71,8 +71,13 @@ DEF_HELPER_3(csrrw, tl, env, tl, tl)
 DEF_HELPER_4(csrrs, tl, env, tl, tl, tl)
 DEF_HELPER_4(csrrc, tl, env, tl, tl, tl)
 #ifndef CONFIG_USER_ONLY
+DEF_HELPER_2(uret, tl, env, tl)
 DEF_HELPER_2(sret, tl, env, tl)
 DEF_HELPER_2(mret, tl, env, tl)
 DEF_HELPER_1(wfi, void, env)
 DEF_HELPER_1(tlb_flush, void, env)
+
+/* DASICS helpers */
+DEF_HELPER_3(dasics_ld_check, void, env, tl, i64)
+DEF_HELPER_3(dasics_st_check, void, env, tl, i64)
 #endif

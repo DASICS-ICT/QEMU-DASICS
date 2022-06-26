@@ -212,6 +212,54 @@
 #define CSR_HIDELEG         0xa03
 #define CSR_HGATP           0xa80
 
+/* DASICS CSRs */
+#define CSR_DSMCFG          0xbc0
+#define CSR_DSMBOUND0       0xbc1
+#define CSR_DSMBOUND1       0xbc2
+
+#define CSR_DUMCFG          0x5c0
+#define CSR_DUMBOUND0       0x5c1
+#define CSR_DUMBOUND1       0x5c2
+
+#define CSR_DLCFG0          0x881
+#define CSR_DLCFG1          0x882
+#define CSR_DLBOUND0        0x883
+#define CSR_DLBOUND1        0x884
+#define CSR_DLBOUND2        0x885
+#define CSR_DLBOUND3        0x886
+#define CSR_DLBOUND4        0x887
+#define CSR_DLBOUND5        0x888
+#define CSR_DLBOUND6        0x889
+#define CSR_DLBOUND7        0x88a
+#define CSR_DLBOUND8        0x88b
+#define CSR_DLBOUND9        0x88c
+#define CSR_DLBOUND10       0x88d
+#define CSR_DLBOUND11       0x88e
+#define CSR_DLBOUND12       0x88f
+#define CSR_DLBOUND13       0x890
+#define CSR_DLBOUND14       0x891
+#define CSR_DLBOUND15       0x892
+#define CSR_DLBOUND16       0x893
+#define CSR_DLBOUND17       0x894
+#define CSR_DLBOUND18       0x895
+#define CSR_DLBOUND19       0x896
+#define CSR_DLBOUND20       0x897
+#define CSR_DLBOUND21       0x898
+#define CSR_DLBOUND22       0x899
+#define CSR_DLBOUND23       0x89a
+#define CSR_DLBOUND24       0x89b
+#define CSR_DLBOUND25       0x89c
+#define CSR_DLBOUND26       0x89d
+#define CSR_DLBOUND27       0x89e
+#define CSR_DLBOUND28       0x89f
+#define CSR_DLBOUND29       0x8a0
+#define CSR_DLBOUND30       0x8a1
+#define CSR_DLBOUND31       0x8a2
+
+#define CSR_DMAINCALL       0x8a3
+#define CSR_DRETPC          0x8a4
+#define CSR_DRETPCFZ        0x8a5
+
 #if defined(TARGET_RISCV32)
 #define HGATP_MODE           SATP32_MODE
 #define HGATP_ASID           SATP32_ASID
@@ -376,6 +424,10 @@
 #define MXL_VAL MXL_RV64
 #endif
 
+/* ustatus CSR bits */
+#define USTATUS_UIE         0x00000001
+#define USTATUS_UPIE        0x00000010
+
 /* sstatus CSR bits */
 #define SSTATUS_UIE         0x00000001
 #define SSTATUS_SIE         0x00000002
@@ -496,6 +548,13 @@
 #define RISCV_EXCP_LOAD_PAGE_FAULT         0xd /* since: priv-1.10.0 */
 #define RISCV_EXCP_STORE_PAGE_FAULT        0xf /* since: priv-1.10.0 */
 
+#define RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT  0x18
+#define RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT  0x19
+#define RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT  0x1a
+#define RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT  0x1b
+#define RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT 0x1c
+#define RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT 0x1d
+
 #define RISCV_EXCP_INT_FLAG                0x80000000
 #define RISCV_EXCP_INT_MASK                0x7fffffff
 
@@ -531,5 +590,10 @@
 #define SIP_SSIP                           MIP_SSIP
 #define SIP_STIP                           MIP_STIP
 #define SIP_SEIP                           MIP_SEIP
+
+/* uip masks*/
+#define UIP_USIP                           MIP_USIP
+#define UIP_UTIP                           MIP_UTIP
+#define UIP_UEIP                           MIP_UEIP
 
 #endif

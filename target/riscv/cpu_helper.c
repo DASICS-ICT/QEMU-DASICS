@@ -38,11 +38,14 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
 {
     target_ulong mstatus_mie = get_field(env->mstatus, MSTATUS_MIE);
     target_ulong mstatus_sie = get_field(env->mstatus, MSTATUS_SIE);
+    target_ulong mstatus_uie = get_field(env->mstatus, MSTATUS_UIE);
     target_ulong pending = atomic_read(&env->mip) & env->mie;
     target_ulong mie = env->priv < PRV_M || (env->priv == PRV_M && mstatus_mie);
     target_ulong sie = env->priv < PRV_S || (env->priv == PRV_S && mstatus_sie);
+    target_ulong uie = env->priv == PRV_U && mstatus_uie;
     target_ulong irqs = (pending & ~env->mideleg & -mie) |
-                        (pending &  env->mideleg & -sie);
+                        (pending &  env->mideleg & ~env->sideleg & -sie) |
+                        (pending &  env->sideleg & -uie);
 
     if (irqs) {
         return ctz64(irqs); /* since non-zero */
@@ -513,6 +516,8 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     bool async = !!(cs->exception_index & RISCV_EXCP_INT_FLAG);
     target_ulong cause = cs->exception_index & RISCV_EXCP_INT_MASK;
     target_ulong deleg = async ? env->mideleg : env->medeleg;
+    target_ulong delegS = riscv_has_ext(env, RVN) ? \
+        (async ? env->sideleg : env->sedeleg) : 0;
     target_ulong tval = 0;
 
     static const int ecall_cause_map[] = {
@@ -534,6 +539,12 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         case RISCV_EXCP_INST_PAGE_FAULT:
         case RISCV_EXCP_LOAD_PAGE_FAULT:
         case RISCV_EXCP_STORE_PAGE_FAULT:
+        case RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT:
+        case RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT:
+        case RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT:
+        case RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT:
+        case RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT:
+        case RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT:
             tval = env->badaddr;
             break;
         default:
@@ -549,7 +560,20 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     trace_riscv_trap(env->mhartid, async, cause, env->pc, tval, cause < 16 ?
         (async ? riscv_intr_names : riscv_excp_names)[cause] : "(unknown)");
 
-    if (env->priv <= PRV_S &&
+    if (riscv_has_ext(RVN) && env->priv == PRV_U &&
+            cause < TARGET_LONG_BITS && ((delegS >> cause) & 1)) {
+        /* handle the trap in U-mode */
+        target_ulong s = env->mstatus;
+        s = set_field(s, MSTATUS_UPIE, get_field(s, MSTATUS_UIE));
+        s = set_field(s, MSTATUS_UIE, 0);
+        env->mstatus = s;
+        env->ucause = cause | ((target_ulong)async << (TARGET_LONG_BITS - 1));
+        env->uepc = env->pc;
+        env->utval = tval;
+        env->pc = (env->utvec >> 2 << 2) +
+            ((async && (env->utvec & 3) == 1) ? cause * 4 : 0);
+        riscv_cpu_set_mode(env, PRV_U);
+    } else if (env->priv <= PRV_S &&
             cause < TARGET_LONG_BITS && ((deleg >> cause) & 1)) {
         /* handle the trap in S-mode */
         target_ulong s = env->mstatus;

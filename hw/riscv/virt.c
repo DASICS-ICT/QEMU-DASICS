@@ -226,10 +226,12 @@ static void *create_fdt(RISCVVirtState *s, const struct MemmapEntry *memmap,
         nodename =
             g_strdup_printf("/cpus/cpu@%d/interrupt-controller", cpu);
         uint32_t intc_phandle = qemu_fdt_get_phandle(fdt, nodename);
-        cells[cpu * 4 + 0] = cpu_to_be32(intc_phandle);
-        cells[cpu * 4 + 1] = cpu_to_be32(IRQ_M_EXT);
-        cells[cpu * 4 + 2] = cpu_to_be32(intc_phandle);
-        cells[cpu * 4 + 3] = cpu_to_be32(IRQ_S_EXT);
+        cells[cpu * 6 + 0] = cpu_to_be32(intc_phandle);
+        cells[cpu * 6 + 1] = cpu_to_be32(IRQ_M_EXT);
+        cells[cpu * 6 + 2] = cpu_to_be32(intc_phandle);
+        cells[cpu * 6 + 3] = cpu_to_be32(IRQ_S_EXT);
+        cells[cpu * 6 + 4] = cpu_to_be32(intc_phandle);
+        cells[cpu * 6 + 5] = cpu_to_be32(IRQ_U_EXT);
         g_free(nodename);
     }
     nodename = g_strdup_printf("/soc/interrupt-controller@%lx",

@@ -67,6 +67,7 @@
 #define RVC RV('C')
 #define RVS RV('S')
 #define RVU RV('U')
+#define RVN RV('N')
 
 /* S extension denotes that Supervisor mode exists, however it is possible
    to have a core that support S mode but does not have an MMU and there
@@ -75,7 +76,8 @@
 enum {
     RISCV_FEATURE_MMU,
     RISCV_FEATURE_PMP,
-    RISCV_FEATURE_MISA
+    RISCV_FEATURE_MISA,
+    RISCV_FEATURE_DASICS
 };
 
 #define PRIV_VERSION_1_09_1 0x00010901
@@ -92,6 +94,7 @@ enum {
 typedef struct CPURISCVState CPURISCVState;
 
 #include "pmp.h"
+#include "dasics.h"
 
 struct CPURISCVState {
     target_ulong gpr[32];
@@ -135,12 +138,19 @@ struct CPURISCVState {
 
     target_ulong mie;
     target_ulong mideleg;
+    target_ulong sideleg;
 
     target_ulong sptbr;  /* until: priv-1.9.1 */
     target_ulong satp;   /* since: priv-1.10.0 */
     target_ulong sbadaddr;
     target_ulong mbadaddr;
     target_ulong medeleg;
+    target_ulong sedeleg;
+
+    target_ulong utvec;
+    target_ulong uepc;
+    target_ulong ucause;
+    target_ulong utval;
 
     target_ulong stvec;
     target_ulong sepc;
@@ -154,6 +164,7 @@ struct CPURISCVState {
     target_ulong scounteren;
     target_ulong mcounteren;
 
+    target_ulong uscratch;
     target_ulong sscratch;
     target_ulong mscratch;
 
@@ -164,6 +175,9 @@ struct CPURISCVState {
 
     /* physical memory protection */
     pmp_table_t pmp_state;
+
+    /* DASICS Protection Mechanism */
+    dasics_table_t dasics_state;
 
     /* True if in debugger mode.  */
     bool debugger;
@@ -222,6 +236,7 @@ typedef struct RISCVCPU {
         bool ext_c;
         bool ext_s;
         bool ext_u;
+        bool ext_n;
         bool ext_counters;
         bool ext_ifencei;
         bool ext_icsr;
@@ -230,6 +245,7 @@ typedef struct RISCVCPU {
         char *user_spec;
         bool mmu;
         bool pmp;
+        bool dasics;
     } cfg;
 } RISCVCPU;
 
