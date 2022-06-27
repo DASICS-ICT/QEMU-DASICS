@@ -186,7 +186,7 @@ void helper_tlb_flush(CPURISCVState *env)
 }
 
 /* DASICS helpers */
-void helper_dasics_ld_check(CPURISCVState *env, target_ulong addr, uint64_t pc)
+void helper_dasics_ld_check(CPURISCVState *env, target_ulong addr)
 {
     // Load from trusted code zone is permitted
     if (!riscv_feature(env, RISCV_FEATURE_DASICS) || dasics_in_trusted_zone(env)) {
@@ -215,7 +215,7 @@ void helper_dasics_ld_check(CPURISCVState *env, target_ulong addr, uint64_t pc)
     }
 }
 
-void helper_dasics_st_check(CPURISCVState *env, target_ulong addr, uint64_t pc)
+void helper_dasics_st_check(CPURISCVState *env, target_ulong addr)
 {
     // Store from trusted code zone is permitted
     if (!riscv_feature(env, RISCV_FEATURE_DASICS) || dasics_in_trusted_zone(env)) {
