@@ -560,7 +560,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     trace_riscv_trap(env->mhartid, async, cause, env->pc, tval, cause < 16 ?
         (async ? riscv_intr_names : riscv_excp_names)[cause] : "(unknown)");
 
-    if (riscv_has_ext(RVN) && env->priv == PRV_U &&
+    if (riscv_has_ext(env, RVN) && env->priv == PRV_U &&
             cause < TARGET_LONG_BITS && ((delegS >> cause) & 1)) {
         /* handle the trap in U-mode */
         target_ulong s = env->mstatus;

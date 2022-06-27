@@ -130,6 +130,49 @@
   <reg name="pmpaddr13" bitsize="32"/>
   <reg name="pmpaddr14" bitsize="32"/>
   <reg name="pmpaddr15" bitsize="32"/>
+  <reg name="dsmcfg" bitsize="32"/>
+  <reg name="dsmbound0" bitsize="32"/>
+  <reg name="dsmbound1" bitsize="32"/>
+  <reg name="dumcfg" bitsize="32"/>
+  <reg name="dumbound0" bitsize="32"/>
+  <reg name="dumbound1" bitsize="32"/>
+  <reg name="dlcfg0" bitsize="32"/>
+  <reg name="dlcfg1" bitsize="32"/>
+  <reg name="dlbound0" bitsize="32"/>
+  <reg name="dlbound1" bitsize="32"/>
+  <reg name="dlbound2" bitsize="32"/>
+  <reg name="dlbound3" bitsize="32"/>
+  <reg name="dlbound4" bitsize="32"/>
+  <reg name="dlbound5" bitsize="32"/>
+  <reg name="dlbound6" bitsize="32"/>
+  <reg name="dlbound7" bitsize="32"/>
+  <reg name="dlbound8" bitsize="32"/>
+  <reg name="dlbound9" bitsize="32"/>
+  <reg name="dlbound10" bitsize="32"/>
+  <reg name="dlbound11" bitsize="32"/>
+  <reg name="dlbound12" bitsize="32"/>
+  <reg name="dlbound13" bitsize="32"/>
+  <reg name="dlbound14" bitsize="32"/>
+  <reg name="dlbound15" bitsize="32"/>
+  <reg name="dlbound16" bitsize="32"/>
+  <reg name="dlbound17" bitsize="32"/>
+  <reg name="dlbound18" bitsize="32"/>
+  <reg name="dlbound19" bitsize="32"/>
+  <reg name="dlbound20" bitsize="32"/>
+  <reg name="dlbound21" bitsize="32"/>
+  <reg name="dlbound22" bitsize="32"/>
+  <reg name="dlbound23" bitsize="32"/>
+  <reg name="dlbound24" bitsize="32"/>
+  <reg name="dlbound25" bitsize="32"/>
+  <reg name="dlbound26" bitsize="32"/>
+  <reg name="dlbound27" bitsize="32"/>
+  <reg name="dlbound28" bitsize="32"/>
+  <reg name="dlbound29" bitsize="32"/>
+  <reg name="dlbound30" bitsize="32"/>
+  <reg name="dlbound31" bitsize="32"/>
+  <reg name="dmaincall" bitsize="32"/>
+  <reg name="dretpc" bitsize="32"/>
+  <reg name="dretpcfz" bitsize="32"/>
   <reg name="mcycle" bitsize="32"/>
   <reg name="minstret" bitsize="32"/>
   <reg name="mhpmcounter3" bitsize="32"/>

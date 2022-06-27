@@ -899,7 +899,7 @@ static int rmw_uip(CPURISCVState *env, int csrno, target_ulong *ret_value,
                    target_ulong new_value, target_ulong write_mask)
 {
     int ret = rmw_mip(env, CSR_MSTATUS, ret_value, new_value,
-                      write_mask & env->sideleg & sip_writable_mask);
+                      write_mask & env->sideleg & uip_writable_mask);
     *ret_value &= env->sideleg;
     return ret;
 }
@@ -970,19 +970,21 @@ static int read_dlcfg(CPURISCVState *env, int csrno, target_ulong *val)
 {
     int idx = csrno - CSR_DLCFG0;
 
-    if (0 <= idx && idx <= (MAX_DASICS_LIBBOUNDS >> 3)) {
+    if (0 <= idx && idx < (MAX_DASICS_LIBBOUNDS >> 3)) {
 #if defined(TARGET_RISCV32)
         uint32_t step = 4;  // RV32
 #else
         uint32_t step = 8;  // RV64
 #endif
         target_ulong cfgval = 0;
+        target_ulong _val = 0;
 
         // Each libcfg contains 8 tiny configs
         for (int i = 0; i < 8; ++i) {
             cfgval = env->dasics_state.libcfg[(idx << 3) + i] & LIBCFG_MASK;
-            *val |= (cfgval << (i * step));
+            _val |= (cfgval << (i * step));
         }
+        *val = _val;
     } else {
         qemu_log_mask(LOG_GUEST_ERROR,
                       "Ignoring dlcfg read: Out of range! csrno = %d\n", csrno);
@@ -995,7 +997,7 @@ static int write_dlcfg(CPURISCVState *env, int csrno, target_ulong val)
 {
     int idx = csrno - CSR_DLCFG0;
 
-    if (0 <= idx && idx <= (MAX_DASICS_LIBBOUNDS >> 3)) {
+    if (0 <= idx && idx < (MAX_DASICS_LIBBOUNDS >> 3)) {
 #if defined(TARGET_RISCV32)
         uint32_t step = 4;  // RV32
 #else
@@ -1134,8 +1136,8 @@ static int write_dsmcfg(CPURISCVState *env, int csrno, target_ulong val)
     bool val_ucls = (val & MCFG_UCLS) != 0;
 
     if (val_scls) {
-        write_dmbound(env, CSR_DUMBOUND0, 0);
-        write_dmbound(env, CSR_DUMBOUND1, 0);
+        write_dumbound(env, CSR_DUMBOUND0, 0);
+        write_dumbound(env, CSR_DUMBOUND1, 0);
     }
 
     if (val_scls || val_ucls) {
@@ -1351,23 +1353,26 @@ static riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_UTVEC] =               { uli, read_utvec,        write_utvec        },
 
     /* User Trap Handling */
-    [CSR_USCRATCH] =            {uli, read_uscratch,      write_uscratch     },
-    [CSR_UEPC] =                {uli, read_uepc,          write_uepc         },
-    [CSR_UCAUSE] =              {uli, read_ucause,        write_ucause       },
-    [CSR_UTVAL] =               {uli, read_utval,         write_utval        },
-    [CSR_UIP] =                 {uli, NULL,        NULL,    rmw_uip},
+    [CSR_USCRATCH] =            { uli, read_uscratch,      write_uscratch     },
+    [CSR_UEPC] =                { uli, read_uepc,          write_uepc         },
+    [CSR_UCAUSE] =              { uli, read_ucause,        write_ucause       },
+    [CSR_UTVAL] =               { uli, read_utval,         write_utval        },
+    [CSR_UIP] =                 { uli, NULL,       NULL,    rmw_uip           },
 
     /* Physical Memory Protection */
     [CSR_PMPCFG0  ... CSR_PMPADDR9] =  { pmp,   read_pmpcfg,  write_pmpcfg   },
     [CSR_PMPADDR0 ... CSR_PMPADDR15] = { pmp,   read_pmpaddr, write_pmpaddr  },
 
     /* DASICS Protection Mechanism */
-    [CSR_DSMCFG] =                      { dasics, read_dsmcfg,   write_dsmcfg  },
-    [CSR_DSMBOUND0 ... CSR_DSMBOUND1] = { dasics, read_dsmbound, write_dsmbound},
-    [CSR_DUMCFG] =                      { dasics, read_dumcfg,   write_dumcfg  },
-    [CSR_DUMBOUND0 ... CSR_DUMBOUND1] = { dasics, read_dumbound, write_dumbound},
-    [CSR_DLCFG0 ... CSR_DLCFG1] =       { dasics, read_dlcfg,    write_dlcfg   },
-    [CSR_DLBOUND0 ... CSR_DLBOUND31] =  { dasics, read_dlbound,  write_dlbound },
+    [CSR_DSMCFG] =                      { dasics, read_dsmcfg,    write_dsmcfg    },
+    [CSR_DSMBOUND0 ... CSR_DSMBOUND1] = { dasics, read_dsmbound,  write_dsmbound  },
+    [CSR_DUMCFG] =                      { dasics, read_dumcfg,    write_dumcfg    },
+    [CSR_DUMBOUND0 ... CSR_DUMBOUND1] = { dasics, read_dumbound,  write_dumbound  },
+    [CSR_DLCFG0 ... CSR_DLCFG1] =       { dasics, read_dlcfg,     write_dlcfg     },
+    [CSR_DLBOUND0 ... CSR_DLBOUND31] =  { dasics, read_dlbound,   write_dlbound   },
+    [CSR_DMAINCALL] =                   { dasics, read_dmaincall, write_dmaincall },
+    [CSR_DRETPC] =                      { dasics, read_dretpc,    write_dretpc    },
+    [CSR_DRETPCFZ] =                    { dasics, read_dretpcfz,  write_dretpcfz  },
 
     /* Performance Counters */
     [CSR_HPMCOUNTER3   ... CSR_HPMCOUNTER31] =    { ctr,  read_zero          },

@@ -106,15 +106,15 @@ target_ulong helper_sret(CPURISCVState *env, target_ulong cpu_pc_deb)
 
     // Special function provided for UCAS-OS Lab: sepc must within d*mbounds!
     if (riscv_feature(env, RISCV_FEATURE_DASICS) &&
-            (env->dasics_state.maincfg & MCFG_OSLAB) &&) {
+            (env->dasics_state.maincfg & MCFG_OSLAB)) {
         bool in_dsmbounds = env->dasics_state.smbound.lo <= retpc &&
                             env->dasics_state.smbound.hi >= retpc;
         bool in_dumbounds = env->dasics_state.umbound.lo <= retpc &&
                             env->dasics_state.umbound.hi >= retpc;
-        target_ulong spp = get_field(mstatus, MSTATUS_SPP);
+        target_ulong spp = get_field(env->mstatus, MSTATUS_SPP);
 
         if (!((spp == PRV_S && in_dsmbounds) || (spp == PRV_U && in_dumbounds))) {
-            raise_exception(env, RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT, GETPC());
+            riscv_raise_exception(env, RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT, GETPC());
         }
     }
 
@@ -188,11 +188,8 @@ void helper_tlb_flush(CPURISCVState *env)
 /* DASICS helpers */
 void helper_dasics_ld_check(CPURISCVState *env, target_ulong addr, uint64_t pc)
 {
-    // FIXME: Is GETPC() different from env->pc ???
-    assert(env->pc == GETPC());
-
     // Load from trusted code zone is permitted
-    if (dasics_in_trusted_zone(env)) {
+    if (!riscv_feature(env, RISCV_FEATURE_DASICS) || dasics_in_trusted_zone(env)) {
         return;
     }
 
@@ -213,17 +210,15 @@ void helper_dasics_ld_check(CPURISCVState *env, target_ulong addr, uint64_t pc)
         uint32_t exception = (env->priv == PRV_U) ?
                                 RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT:
                                 RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT;
+        env->badaddr = addr;
         riscv_raise_exception(env, exception, GETPC());
     }
 }
 
 void helper_dasics_st_check(CPURISCVState *env, target_ulong addr, uint64_t pc)
 {
-    // FIXME: Is GETPC() different from env->pc ???
-    assert(env->pc == GETPC());
-
     // Store from trusted code zone is permitted
-    if (dasics_in_trusted_zone(env)) {
+    if (!riscv_feature(env, RISCV_FEATURE_DASICS) || dasics_in_trusted_zone(env)) {
         return;
     }
 
@@ -244,7 +239,9 @@ void helper_dasics_st_check(CPURISCVState *env, target_ulong addr, uint64_t pc)
         uint32_t exception = (env->priv == PRV_U) ?
                                 RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT:
                                 RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT;
+        env->badaddr = addr;
         riscv_raise_exception(env, exception, GETPC());
+    }
 }
 
 #endif /* !CONFIG_USER_ONLY */
