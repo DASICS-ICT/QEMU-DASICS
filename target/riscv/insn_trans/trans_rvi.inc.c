@@ -42,6 +42,11 @@ static bool trans_auipc(DisasContext *ctx, arg_auipc *a)
 
 static bool trans_jal(DisasContext *ctx, arg_jal *a)
 {
+#ifndef CONFIG_USER_ONLY
+    gen_helper_dasics_redirect(cpu_env, tcg_const_i64(ctx->base.pc_next + a->imm),
+                               tcg_const_i64(ctx->pc_succ_insn),
+                               tcg_const_i64(0));
+#endif
     gen_jal(ctx, a->rd, a->imm);
     return true;
 }
@@ -52,10 +57,16 @@ static bool trans_jalr(DisasContext *ctx, arg_jalr *a)
     TCGLabel *misaligned = NULL;
     TCGv t0 = tcg_temp_new();
 
+    gen_get_gpr(t0, a->rs1);
+    tcg_gen_addi_tl(t0, t0, a->imm);
+    tcg_gen_andi_tl(t0, t0, (target_ulong)-2);
 
-    gen_get_gpr(cpu_pc, a->rs1);
-    tcg_gen_addi_tl(cpu_pc, cpu_pc, a->imm);
-    tcg_gen_andi_tl(cpu_pc, cpu_pc, (target_ulong)-2);
+#ifndef CONFIG_USER_ONLY
+    gen_helper_dasics_redirect(cpu_env, t0, tcg_const_i64(ctx->pc_succ_insn),
+                               tcg_const_i64(0));
+#endif
+
+    tcg_gen_mov_tl(cpu_pc, t0);
 
     if (!has_ext(ctx, RVC)) {
         misaligned = gen_new_label();
@@ -86,6 +97,12 @@ static bool gen_branch(DisasContext *ctx, arg_b *a, TCGCond cond)
     source2 = tcg_temp_new();
     gen_get_gpr(source1, a->rs1);
     gen_get_gpr(source2, a->rs2);
+
+#ifndef CONFIG_USER_ONLY
+    gen_helper_dasics_redirect(cpu_env, tcg_const_i64(ctx->base.pc_next + a->imm),
+                               tcg_const_i64(ctx->pc_succ_insn),
+                               tcg_const_i64(0));
+#endif
 
     tcg_gen_brcond_tl(cond, source1, source2, l);
     gen_goto_tb(ctx, 1, ctx->pc_succ_insn);

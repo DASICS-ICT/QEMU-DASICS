@@ -189,24 +189,13 @@ void helper_tlb_flush(CPURISCVState *env)
 void helper_dasics_ld_check(CPURISCVState *env, target_ulong addr)
 {
     // Load from trusted code zone is permitted
-    if (!riscv_feature(env, RISCV_FEATURE_DASICS) || dasics_in_trusted_zone(env)) {
+    if (!riscv_feature(env, RISCV_FEATURE_DASICS) ||
+            dasics_in_trusted_zone(env, env->pc)) {
         return;
     }
 
     // Check whether target address is within dlibbounds
-    bool withinRange = false;
-    for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
-        uint8_t cfgval = env->dasics_state.libcfg[i];
-        target_ulong boundhi = env->dasics_state.libbound[i].hi;
-        target_ulong boundlo = env->dasics_state.libbound[i].lo;
-        if ((cfgval & LIBCFG_V) && (cfgval & LIBCFG_R) && \
-                boundlo <= addr && addr <= boundhi) {
-            withinRange = true;
-            break;
-        }
-    }
-
-    if (!withinRange) {
+    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_R)) {
         uint32_t exception = (env->priv == PRV_U) ?
                                 RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT:
                                 RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT;
@@ -218,29 +207,56 @@ void helper_dasics_ld_check(CPURISCVState *env, target_ulong addr)
 void helper_dasics_st_check(CPURISCVState *env, target_ulong addr)
 {
     // Store from trusted code zone is permitted
-    if (!riscv_feature(env, RISCV_FEATURE_DASICS) || dasics_in_trusted_zone(env)) {
+    if (!riscv_feature(env, RISCV_FEATURE_DASICS) ||
+            dasics_in_trusted_zone(env, env->pc)) {
         return;
     }
 
     // Check whether target address is within dlibbounds
-    bool withinRange = false;
-    for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
-        uint8_t cfgval = env->dasics_state.libcfg[i];
-        target_ulong boundhi = env->dasics_state.libbound[i].hi;
-        target_ulong boundlo = env->dasics_state.libbound[i].lo;
-        if ((cfgval & LIBCFG_V) && (cfgval & LIBCFG_W) && \
-                boundlo <= addr && addr <= boundhi) {
-            withinRange = true;
-            break;
-        }
-    }
-
-    if (!withinRange) {
+    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_W)) {
         uint32_t exception = (env->priv == PRV_U) ?
                                 RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT:
                                 RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT;
         env->badaddr = addr;
         riscv_raise_exception(env, exception, GETPC());
+    }
+}
+
+void helper_dasics_redirect(CPURISCVState *env, target_ulong newpc, target_ulong nextpc, uint64_t is_dasicsret)
+{
+    if (!riscv_feature(env, RISCV_FEATURE_DASICS)) {
+        return;
+    }
+
+    // Check whether this redirect instr is permitted
+    int src_trusted = dasics_in_trusted_zone(env, env->pc);
+    int dst_trusted = dasics_in_trusted_zone(env, newpc);
+    int src_freezone = dasics_match_dlib(env, env->pc, LIBCFG_V | LIBCFG_X);
+    int dst_freezone = dasics_match_dlib(env, newpc, LIBCFG_V | LIBCFG_X);
+
+    int allow_lib_to_main = !src_trusted && dst_trusted &&
+        (newpc == env->dasics_state.dretpc || newpc == env->dasics_state.dmaincall);
+    int allow_freezone_to_lib = src_freezone && !dst_trusted &&
+        !dst_freezone && (newpc == env->dasics_state.dretpcfz);
+
+    int allow_brjp = src_trusted  || allow_lib_to_main ||
+                     dst_freezone || allow_freezone_to_lib;
+
+    if (!allow_brjp) {
+        uint32_t exception = (env->priv == PRV_U) ?
+                                RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT:
+                                RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT;
+        env->badaddr = newpc;
+        riscv_raise_exception(env, exception, GETPC());
+    }
+
+    // Set dretpc and dretpcfz(FOR DEBUG)
+    if (src_trusted && !dst_trusted && !is_dasicsret) {
+        env->dasics_state.dretpc = nextpc;
+    }
+
+    if (!src_trusted && !src_freezone && !dst_trusted && dst_freezone) {
+        env->dasics_state.dretpcfz = nextpc;
     }
 }
 

@@ -80,4 +80,5 @@ DEF_HELPER_1(tlb_flush, void, env)
 /* DASICS helpers */
 DEF_HELPER_2(dasics_ld_check, void, env, tl)
 DEF_HELPER_2(dasics_st_check, void, env, tl)
+DEF_HELPER_4(dasics_redirect, void, env, tl, tl, i64)
 #endif

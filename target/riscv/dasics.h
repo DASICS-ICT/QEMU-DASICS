@@ -36,6 +36,7 @@ typedef struct {
     target_ulong    dretpcfz;
 } dasics_table_t;
 
-int dasics_in_trusted_zone(CPURISCVState *env);
+int dasics_in_trusted_zone(CPURISCVState *env, target_ulong pc);
+int dasics_match_dlib(CPURISCVState *env, target_ulong addr, target_ulong cfg);
 
 #endif

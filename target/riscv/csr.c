@@ -1198,7 +1198,7 @@ int riscv_csrrw(CPURISCVState *env, int csrno, target_ulong *ret_value,
     int csr_priv = get_field(csrno, 0x300);
     int read_only = get_field(csrno, 0xC00) == 3;
 
-    if (!(env->priv >= csr_priv && dasics_in_trusted_zone(env))) {
+    if (!(env->priv >= csr_priv && dasics_in_trusted_zone(env, env->pc))) {
         return -1;
     }
 
