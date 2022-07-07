@@ -250,13 +250,9 @@ void helper_dasics_redirect(CPURISCVState *env, target_ulong newpc, target_ulong
         riscv_raise_exception(env, exception, GETPC());
     }
 
-    // Set dretpc and dretpcfz(FOR DEBUG)
+    // Set dretpc when redirect from trusted zone to untrusted, if not dasicsret
     if (src_trusted && !dst_trusted && !is_dasicsret) {
         env->dasics_state.dretpc = nextpc;
-    }
-
-    if (!src_trusted && !src_freezone && !dst_trusted && dst_freezone) {
-        env->dasics_state.dretpcfz = nextpc;
     }
 }
 
