@@ -1,13 +1,12 @@
 #ifndef RISCV_DASICS_H
 #define RISCV_DASICS_H
 
-#define MCFG_OSLAB  0x10ul
 #define MCFG_UCLS   0x8ul
 #define MCFG_SCLS   0x4ul
 #define MCFG_UENA   0X2ul
 #define MCFG_SENA   0x1ul
 
-#define SMCFG_MASK  0x1f   /* Add MCFG_OSLAB bit for ucas-os lab */
+#define SMCFG_MASK  0xf
 #define UMCFG_MASK  0xa
 
 #define LIBCFG_MASK 0xful

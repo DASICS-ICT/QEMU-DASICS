@@ -104,20 +104,6 @@ target_ulong helper_sret(CPURISCVState *env, target_ulong cpu_pc_deb)
         riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
     }
 
-    // Special function provided for UCAS-OS Lab: sepc must within d*mbounds!
-    if (riscv_feature(env, RISCV_FEATURE_DASICS) &&
-            (env->dasics_state.maincfg & MCFG_OSLAB)) {
-        bool in_dsmbounds = env->dasics_state.smbound.lo <= retpc &&
-                            env->dasics_state.smbound.hi >= retpc;
-        bool in_dumbounds = env->dasics_state.umbound.lo <= retpc &&
-                            env->dasics_state.umbound.hi >= retpc;
-        target_ulong spp = get_field(env->mstatus, MSTATUS_SPP);
-
-        if (!((spp == PRV_S && in_dsmbounds) || (spp == PRV_U && in_dumbounds))) {
-            riscv_raise_exception(env, RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT, GETPC());
-        }
-    }
-
     target_ulong mstatus = env->mstatus;
     target_ulong prev_priv = get_field(mstatus, MSTATUS_SPP);
     mstatus = set_field(mstatus,
@@ -222,7 +208,8 @@ void helper_dasics_st_check(CPURISCVState *env, target_ulong addr)
     }
 }
 
-void helper_dasics_redirect(CPURISCVState *env, target_ulong newpc, target_ulong nextpc, uint64_t is_dasicsret)
+void helper_dasics_redirect(CPURISCVState *env, target_ulong newpc,
+    target_ulong nextpc, uint64_t is_dasicsret)
 {
     if (!riscv_feature(env, RISCV_FEATURE_DASICS)) {
         return;
