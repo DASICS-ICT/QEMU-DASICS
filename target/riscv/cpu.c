@@ -231,8 +231,8 @@ static void riscv_cpu_dump_state(CPUState *cs, FILE *f, int flags)
     int i;
 
     qemu_fprintf(f, " %s " TARGET_FMT_lx "\n", "pc      ", env->pc);
-    qemu_fprintf(f, " %s " TARGET_FMT_lx "\n", "priv    ", env->priv);
 #ifndef CONFIG_USER_ONLY
+    qemu_fprintf(f, " %s " TARGET_FMT_lx "\n", "priv    ", env->priv);
     qemu_fprintf(f, " %s " TARGET_FMT_lx "\n", "mhartid ", env->mhartid);
     qemu_fprintf(f, " %s " TARGET_FMT_lx "\n", "mstatus ", env->mstatus);
     qemu_fprintf(f, " %s " TARGET_FMT_lx "\n", "mip     ",

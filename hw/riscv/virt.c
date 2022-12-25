@@ -217,21 +217,24 @@ static void *create_fdt(RISCVVirtState *s, const struct MemmapEntry *memmap,
         0x0, memmap[VIRT_CLINT].size);
     qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
         cells, s->soc.num_harts * sizeof(uint32_t) * 4);
+    qemu_fdt_setprop_cell(fdt, nodename, "clock-frequncy-mhz", 60);
     g_free(cells);
     g_free(nodename);
 
+    // uint32_t num_irqs = 2;
+    // uint32_t total_irqs = num_irqs * 2; /* irq , phandle */
     plic_phandle = phandle++;
-    cells =  g_new0(uint32_t, s->soc.num_harts * 6);
+    cells =  g_new0(uint32_t, s->soc.num_harts * 4);
     for (cpu = 0; cpu < s->soc.num_harts; cpu++) {
         nodename =
             g_strdup_printf("/cpus/cpu@%d/interrupt-controller", cpu);
         uint32_t intc_phandle = qemu_fdt_get_phandle(fdt, nodename);
-        cells[cpu * 6 + 0] = cpu_to_be32(intc_phandle);
-        cells[cpu * 6 + 1] = cpu_to_be32(IRQ_M_EXT);
-        cells[cpu * 6 + 2] = cpu_to_be32(intc_phandle);
-        cells[cpu * 6 + 3] = cpu_to_be32(IRQ_S_EXT);
-        cells[cpu * 6 + 4] = cpu_to_be32(intc_phandle);
-        cells[cpu * 6 + 5] = cpu_to_be32(IRQ_U_EXT);
+        cells[cpu * 4 + 0] = cpu_to_be32(intc_phandle);
+        cells[cpu * 4 + 1] = cpu_to_be32(IRQ_M_EXT);
+        cells[cpu * 4 + 2] = cpu_to_be32(intc_phandle);
+        cells[cpu * 4 + 3] = cpu_to_be32(IRQ_S_EXT);
+        // cells[cpu * 6 + 4] = cpu_to_be32(intc_phandle);
+        // cells[cpu * 6 + 5] = cpu_to_be32(IRQ_U_EXT);
         g_free(nodename);
     }
     nodename = g_strdup_printf("/soc/interrupt-controller@%lx",
@@ -244,7 +247,7 @@ static void *create_fdt(RISCVVirtState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,plic0");
     qemu_fdt_setprop(fdt, nodename, "interrupt-controller", NULL, 0);
     qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
-        cells, s->soc.num_harts * sizeof(uint32_t) * 6);
+        cells, s->soc.num_harts * sizeof(uint32_t) * 4);
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
         0x0, memmap[VIRT_PLIC].base,
         0x0, memmap[VIRT_PLIC].size);
