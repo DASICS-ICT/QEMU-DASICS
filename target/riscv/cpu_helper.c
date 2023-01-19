@@ -553,11 +553,22 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         /* ecall is dispatched as one cause so translate based on mode */
         if (cause == RISCV_EXCP_U_ECALL) {
             assert(env->priv <= 3);
-            cause = ecall_cause_map[env->priv];
+            /* check whether this ecall comes from untrusted zone */
+            bool untrusted_u = env->priv == PRV_U && \
+                (env->dasics_state.maincfg & MCFG_UENA) && \
+                !(env->dasics_state.umbound.lo <= env->pc && 
+                    env->pc <= env->dasics_state.umbound.hi);
+            bool untrusted_s = env->priv == PRV_S && \
+                (env->dasics_state.maincfg & MCFG_SENA) && \
+                !(env->dasics_state.smbound.lo <= env->pc &&
+                    env->pc <= env->dasics_state.smbound.hi);
+            cause = (untrusted_s) ? RISCV_EXCP_DASICS_S_ECALL_FAULT :
+                    (untrusted_u) ? RISCV_EXCP_DASICS_U_ECALL_FAULT :
+                                    ecall_cause_map[env->priv];
         }
     }
 
-    trace_riscv_trap(env->mhartid, async, cause, env->pc, tval, cause < 16 ?
+    trace_riscv_trap(env->mhartid, async, cause, env->pc, tval, cause < 32 ?
         (async ? riscv_intr_names : riscv_excp_names)[cause] : "(unknown)");
 
     if (riscv_has_ext(env, RVN) && env->priv == PRV_U &&

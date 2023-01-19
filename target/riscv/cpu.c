@@ -76,7 +76,9 @@ const char * const riscv_excp_names[] = {
     "dasics_user_fault_load",
     "dasics_supervisor_fault_load",
     "dasics_user_fault_store",
-    "dasics_supervisor_fault_store"
+    "dasics_supervisor_fault_store",
+    "dasics_user_fault_ecall",
+    "dasics_supervisor_fault_ecall"
 };
 
 const char * const riscv_intr_names[] = {
