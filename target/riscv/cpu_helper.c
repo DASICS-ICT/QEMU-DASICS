@@ -23,6 +23,7 @@
 #include "exec/exec-all.h"
 #include "tcg-op.h"
 #include "trace.h"
+#include "dasics.h"
 
 int riscv_cpu_mmu_index(CPURISCVState *env, bool ifetch)
 {
@@ -554,14 +555,9 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         if (cause == RISCV_EXCP_U_ECALL) {
             assert(env->priv <= 3);
             /* check whether this ecall comes from untrusted zone */
-            bool untrusted_u = env->priv == PRV_U && \
-                (env->dasics_state.maincfg & MCFG_UENA) && \
-                !(env->dasics_state.umbound.lo <= env->pc && 
-                    env->pc <= env->dasics_state.umbound.hi);
-            bool untrusted_s = env->priv == PRV_S && \
-                (env->dasics_state.maincfg & MCFG_SENA) && \
-                !(env->dasics_state.smbound.lo <= env->pc &&
-                    env->pc <= env->dasics_state.smbound.hi);
+            bool is_trusted = dasics_in_trusted_zone(env, env->pc);
+            bool untrusted_u = env->priv == PRV_U && !is_trusted;
+            bool untrusted_s = env->priv == PRV_S && !is_trusted;
             cause = (untrusted_s) ? RISCV_EXCP_DASICS_S_ECALL_FAULT :
                     (untrusted_u) ? RISCV_EXCP_DASICS_U_ECALL_FAULT :
                                     ecall_cause_map[env->priv];
