@@ -32,6 +32,7 @@ typedef struct {
     dasics_bound_t  umbound;
 
     uint8_t         libcfg[MAX_DASICS_LIBBOUNDS];
+    uint8_t         libaging[MAX_DASICS_LIBBOUNDS];
     dasics_bound_t  libbound[MAX_DASICS_LIBBOUNDS];
 
     uint16_t        libjmpcfg[MAX_DASICS_LIBJMPBOUNDS];

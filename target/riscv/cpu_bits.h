@@ -379,6 +379,8 @@
 #define CSR_DUMBOUND1       0x9e3
 
 #define CSR_DLCFG           0x880
+#define CSR_DLAGING0        0x881
+#define CSR_DLAGING1        0x882
 #define CSR_DLBOUND0        0x890
 #define CSR_DLBOUND1        0x891
 #define CSR_DLBOUND2        0x892

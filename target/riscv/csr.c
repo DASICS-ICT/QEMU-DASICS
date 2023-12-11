@@ -4300,6 +4300,39 @@ static RISCVException write_dlcfg(CPURISCVState *env, int csrno, target_ulong va
     for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
         cfgval = (val >> (step * i)) & LIBCFG_MASK;
         env->dasics_state.libcfg[i] = cfgval;
+        if ((cfgval & LIBCFG_V) == 0) {
+            // Reset corresponding aging bits
+            env->dasics_state.libaging[i] = 0;
+        }
+    }
+
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_dlaging(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    const int num_aging = 8;  // Each CSR_DLAGING contain 8 groups of 8-bit aging
+    const int width_aging = 64 / num_aging;
+    int start = (csrno - CSR_DLAGING0) * num_aging;
+    target_ulong _val = 0;
+
+    for (int i = 0; i < num_aging; ++i) {
+        _val |= (env->dasics_state.libaging[i + start] << (i * width_aging));
+    }
+    *val = _val;
+
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_dlaging(CPURISCVState *env, int csrno, target_ulong val)
+{
+    const int num_aging = 8;  // Each CSR_DLAGING contain 8 groups of 8-bit aging
+    const int width_aging = 64 / num_aging;
+    int start = (csrno - CSR_DLAGING0) * num_aging;
+
+    // Each libcfg contains 8 tiny configs
+    for (int i = 0; i < num_aging; ++i) {
+        env->dasics_state.libaging[i + start] = (uint8_t)(val >> (i * width_aging));
     }
 
     return RISCV_EXCP_NONE;
@@ -5243,6 +5276,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_DUMBOUND1]      = {"dumbound1",    dasics,     read_dumbound,  write_dumbound  },
 
     [CSR_DLCFG]          = {"dlcfg",       dasics,     read_dlcfg,     write_dlcfg     },
+    [CSR_DLAGING0]       = {"dlaging0",     dasics,     read_dlaging,   write_dlaging   },
+    [CSR_DLAGING1]       = {"dlaging1",     dasics,     read_dlaging,   write_dlaging   },
 
     [CSR_DLBOUND0]       = {"dlbound0",     dasics,     read_dlbound,   write_dlbound   },
     [CSR_DLBOUND1]       = {"dlbound1",     dasics,     read_dlbound,   write_dlbound   },

@@ -69,6 +69,12 @@ int dasics_match_dlib(CPURISCVState *env, target_ulong addr, target_ulong cfg) {
         target_ulong boundlo = env->dasics_state.libbound[i].lo;
         if (!((cfgval & cfg) ^ cfg) && boundlo <= addr && addr <= boundhi) {
             withinRange = 1;
+            for (int j = 0; j < MAX_DASICS_LIBBOUNDS; ++j) {
+                env->dasics_state.libaging[j] >>= 1;
+                if (j == i) {
+                    env->dasics_state.libaging[j] |= 0x80u;
+                }
+            }
             break;
         }
     }
