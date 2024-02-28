@@ -38,7 +38,7 @@
 %imm_bs   30:2                   !function=ex_shift_3
 %imm_rnum 20:4
 # *** DASICS Protection Mechanism ***
-%imm_dasics 31:s1 7:1 15:6 8:4 21:10 !function=ex_shift_1
+# %imm_dasics 31:s1 7:1 15:6 8:4 21:10 !function=ex_shift_1
 
 # Argument sets:
 &empty
@@ -58,7 +58,7 @@
 &rnfvm     vm rd rs1 rs2 nf
 &k_aes     shamt rs2 rs1 rd
 # *** DASICS Protection Mechanism ***
-&dasics_j  imm
+# &dasics_j  imm
 
 # Formats 32:
 @r       .......   ..... ..... ... ..... ....... &r                %rs2 %rs1 %rd
@@ -69,7 +69,7 @@
 @j       ....................      ..... ....... &j      imm=%imm_j          %rd
 
 # *** DASICS Protection Mechanism ***
-@dasics_j . .......... ...... ... .... . ....... &dasics_j imm=%imm_dasics 
+# @dasics_j . .......... ...... ... .... . ....... &dasics_j imm=%imm_dasics 
 
 @sh      ......  ...... .....  ... ..... ....... &shift  shamt=%sh7     %rs1 %rd
 @csr     ............   .....  ... ..... .......               %csr     %rs1 %rd
@@ -172,7 +172,7 @@ csrrsi   ............     ..... 110 ..... 1110011 @csr
 csrrci   ............     ..... 111 ..... 1110011 @csr
 
 # *** DASICS Protection Mechanism ***
-dasicscallj    . .......... ...... 000 .... . 0001011 @dasics_j
+# dasicscallj    . .......... ...... 000 .... . 0001011 @dasics_j
 dasicscalljr   ............ ..... 001 ..... 0001011 @i
 
 # *** RV64I Base Instruction Set (in addition to RV32I) ***

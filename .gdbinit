@@ -9,10 +9,13 @@ source scripts/qemu-gdb.py
 
 file ./build/qemu-system-riscv64
 
+b helper_dasics_redirect
+b dasics_in_trusted_zone
 
-run -M virt -m 1G \
-        -nographic -kernel /home/wanghan/Workspace/riscv-pk-qemu/build/bbl \
-        -append "console=ttyS0 rw root=/dev/vda" \
+
+run -M virt -m 256M -nographic -kernel /home/wanghan/Workspace/ucas-os/riscv-pk/build/bbl \
+        -drive file=/home/wanghan/Workspace/ucas-os/ucas-os/img/sd.img,if=none,format=raw,id=x0 \
+        -device virtio-blk-device,drive=x0 \
         -bios none
 
 # b cpu-exec.c:971

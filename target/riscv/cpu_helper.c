@@ -1612,8 +1612,6 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     bool async = !!(cs->exception_index & RISCV_EXCP_INT_FLAG);
     target_ulong cause = cs->exception_index & RISCV_EXCP_INT_MASK;
     uint64_t deleg = async ? env->mideleg : env->medeleg;
-    uint64_t delegS = riscv_has_ext(env, RVN) ? \
-        (async ? env->sideleg : env->sedeleg) : 0;
     target_ulong tval = 0;
     target_ulong tinst = 0;
     target_ulong htval = 0;
@@ -1637,12 +1635,9 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         case RISCV_EXCP_LOAD_PAGE_FAULT:
         case RISCV_EXCP_STORE_PAGE_FAULT:
         // DASICS Exception number
-        case RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT:
-        case RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT:
-        case RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT:
-        case RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT:
-        case RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT:
-        case RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT:        
+        case FDIUJumpFault:
+        case FDIULoadAccessFault:
+        case FDIUStoreAccessFault:
             write_gva = env->two_stage_lookup;
             tval = env->badaddr;
             if (env->two_stage_indirect_lookup) {
@@ -1699,13 +1694,6 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             } else if (env->priv == PRV_U) {
                 cause = RISCV_EXCP_U_ECALL;
             }
-            /* check whether this ecall comes from untrusted zone */
-            bool is_trusted = dasics_in_trusted_zone(env, env->pc);
-            bool untrusted_u = env->priv == PRV_U && !is_trusted;
-            bool untrusted_s = env->priv == PRV_S && !is_trusted;
-            cause = (untrusted_s) ? RISCV_EXCP_DASICS_S_ECALL_FAULT :
-                    (untrusted_u) ? RISCV_EXCP_DASICS_U_ECALL_FAULT :
-                                    cause;            
 
         }
     }
@@ -1719,20 +1707,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                   __func__, env->mhartid, async, cause, env->pc, tval,
                   riscv_cpu_get_trap_name(cause, async));
 
-    if (riscv_has_ext(env, RVN) && env->priv == PRV_U &&
-            cause < TARGET_LONG_BITS && ((delegS >> cause) & 1)) {
-        /* handle the trap in U-mode */
-        target_ulong s = env->mstatus;
-        s = set_field(s, MSTATUS_UPIE, get_field(s, MSTATUS_UIE));
-        s = set_field(s, MSTATUS_UIE, 0);
-        env->mstatus = s;
-        env->ucause = cause | ((target_ulong)async << (TARGET_LONG_BITS - 1));
-        env->uepc = env->pc;
-        env->utval = tval;
-        env->pc = (env->utvec >> 2 << 2) +
-            ((async && (env->utvec & 3) == 1) ? cause * 4 : 0);
-        riscv_cpu_set_mode(env, PRV_U);
-    } else if (env->priv <= PRV_S &&
+    if (env->priv <= PRV_S &&
             cause < TARGET_LONG_BITS && ((deleg >> cause) & 1)) {
         /* handle the trap in S-mode */
         if (riscv_has_ext(env, RVH)) {
