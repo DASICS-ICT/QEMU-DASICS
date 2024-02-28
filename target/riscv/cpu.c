@@ -227,13 +227,13 @@ static const char * const riscv_excp_names[] = {
     "reserved",
     "guest_store_page_fault",
     "dasics_user_fault_fetch",
-    "dasics_supervisor_fault_fetch",
+    // "dasics_supervisor_fault_fetch",
     "dasics_user_fault_load",
-    "dasics_supervisor_fault_load",
+    // "dasics_supervisor_fault_load",
     "dasics_user_fault_store",
-    "dasics_supervisor_fault_store",
-    "dasics_user_fault_ecall",
-    "dasics_supervisor_fault_ecall"
+    // "dasics_supervisor_fault_store",
+    // "dasics_user_fault_ecall",
+    // "dasics_supervisor_fault_ecall"
 };
 
 static const char * const riscv_intr_names[] = {
@@ -1676,7 +1676,7 @@ static const MISAExtInfo misa_ext_info_arr[] = {
     MISA_EXT_INFO(RVU, "u", "User-level instructions"),
     MISA_EXT_INFO(RVH, "h", "Hypervisor"),
     MISA_EXT_INFO(RVJ, "x-j", "Dynamic translated languages"),
-    MISA_EXT_INFO(RVN, "n", "N extension User-Level Interrupts"),
+    // MISA_EXT_INFO(RVN, "n", "N extension User-Level Interrupts"),
     MISA_EXT_INFO(RVV, "v", "Vector operations"),
     MISA_EXT_INFO(RVG, "g", "General purpose (IMAFD_Zicsr_Zifencei)"),
 };
@@ -1728,7 +1728,7 @@ static RISCVCPUMisaExtConfig misa_ext_cfgs[] = {
     MISA_CFG(RVS, true),
     MISA_CFG(RVU, true),
     MISA_CFG(RVH, true),
-    MISA_CFG(RVN, true),
+    // MISA_CFG(RVN, true),
     MISA_CFG(RVJ, false),
     MISA_CFG(RVV, false),
     MISA_CFG(RVG, false),

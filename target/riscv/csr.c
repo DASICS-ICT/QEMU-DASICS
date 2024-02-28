@@ -288,13 +288,13 @@ static int aia_smode32(CPURISCVState *env, int csrno)
     return smode32(env, csrno);
 }
 
-static int uli(CPURISCVState *env, int csrno)
-{
-    if (riscv_has_ext(env, RVN)) {
-        return RISCV_EXCP_NONE;
-    }
-    return RISCV_EXCP_ILLEGAL_INST;
-}
+// static int uli(CPURISCVState *env, int csrno)
+// {
+//     if (riscv_has_ext(env, RVN)) {
+//         return RISCV_EXCP_NONE;
+//     }
+//     return RISCV_EXCP_ILLEGAL_INST;
+// }
 
 static RISCVException hmode(CPURISCVState *env, int csrno)
 {
@@ -1173,14 +1173,10 @@ static const uint64_t all_ints = M_MODE_INTERRUPTS | S_MODE_INTERRUPTS |
                          (1ULL << (RISCV_EXCP_LOAD_GUEST_ACCESS_FAULT)) | \
                          (1ULL << (RISCV_EXCP_VIRT_INSTRUCTION_FAULT)) | \
                          (1ULL << (RISCV_EXCP_STORE_GUEST_AMO_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_U_ECALL_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_S_ECALL_FAULT)))
+                         (1ULL << (FDIUJumpFault)) | \
+                         (1ULL << (FDIULoadAccessFault)) | \
+                         (1ULL << (FDIUStoreAccessFault)) \
+                         )
 static const target_ulong vs_delegable_excps = DELEGABLE_EXCPS &
     ~((1ULL << (RISCV_EXCP_S_ECALL)) |
       (1ULL << (RISCV_EXCP_VS_ECALL)) |
@@ -1192,11 +1188,11 @@ static const target_ulong vs_delegable_excps = DELEGABLE_EXCPS &
 static const target_ulong sstatus_v1_10_mask = SSTATUS_SIE | SSTATUS_SPIE |
     SSTATUS_UIE | SSTATUS_UPIE | SSTATUS_SPP | SSTATUS_FS | SSTATUS_XS |
     SSTATUS_SUM | SSTATUS_MXR | SSTATUS_VS;
-static const target_ulong ustatus_mask = USTATUS_UIE | USTATUS_UPIE;
+// static const target_ulong ustatus_mask = USTATUS_UIE | USTATUS_UPIE;
 
 static const target_ulong sip_writable_mask = SIP_SSIP | MIP_USIP | MIP_UEIP |
                                               SIP_LCOFIP;
-static const target_ulong uip_writable_mask = UIP_USIP;
+// static const target_ulong uip_writable_mask = UIP_USIP;
 
 static const target_ulong hip_writable_mask = MIP_VSSIP;
 static const target_ulong hvip_writable_mask = MIP_VSSIP | MIP_VSTIP |
@@ -2817,106 +2813,106 @@ static RISCVException write_satp(CPURISCVState *env, int csrno,
 }
 
 /* User Trap Setup */
-static int read_ustatus(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->mstatus & ustatus_mask;
-    return RISCV_EXCP_NONE;
-}
+// static int read_ustatus(CPURISCVState *env, int csrno, target_ulong *val)
+// {
+//     *val = env->mstatus & ustatus_mask;
+//     return RISCV_EXCP_NONE;
+// }
 
-static int write_ustatus(CPURISCVState *env, int csrno, target_ulong val)
-{
-    target_ulong newval = (env->mstatus & ~ustatus_mask) | (val & ustatus_mask);
-    return write_mstatus(env, CSR_MSTATUS, newval);
-}
+// static int write_ustatus(CPURISCVState *env, int csrno, target_ulong val)
+// {
+//     target_ulong newval = (env->mstatus & ~ustatus_mask) | (val & ustatus_mask);
+//     return write_mstatus(env, CSR_MSTATUS, newval);
+// }
 
-static int read_uie(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->mie & env->sideleg;
-    return RISCV_EXCP_NONE;
-}
+// static int read_uie(CPURISCVState *env, int csrno, target_ulong *val)
+// {
+//     *val = env->mie & env->sideleg;
+//     return RISCV_EXCP_NONE;
+// }
 
-static int write_uie(CPURISCVState *env, int csrno, target_ulong val)
-{
-    target_ulong newval = (env->mie & ~U_MODE_INTERRUPTS) |
-                          (val & U_MODE_INTERRUPTS);
-    return rmw_mie(env, CSR_MIE, NULL, newval, (target_long)(-1));
-}
+// static int write_uie(CPURISCVState *env, int csrno, target_ulong val)
+// {
+//     target_ulong newval = (env->mie & ~U_MODE_INTERRUPTS) |
+//                           (val & U_MODE_INTERRUPTS);
+//     return rmw_mie(env, CSR_MIE, NULL, newval, (target_long)(-1));
+// }
 
-static int read_utvec(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->utvec;
-    return RISCV_EXCP_NONE;
-}
+// static int read_utvec(CPURISCVState *env, int csrno, target_ulong *val)
+// {
+//     *val = env->utvec;
+//     return RISCV_EXCP_NONE;
+// }
 
-static int write_utvec(CPURISCVState *env, int csrno, target_ulong val)
-{
-    /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
-    if ((val & 3) < 2) {
-        env->utvec = val;
-    } else {
-        qemu_log_mask(LOG_UNIMP, "CSR_UTVEC: reserved mode not supported\n");
-    }
-    return RISCV_EXCP_NONE;
-}
+// static int write_utvec(CPURISCVState *env, int csrno, target_ulong val)
+// {
+//     /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
+//     if ((val & 3) < 2) {
+//         env->utvec = val;
+//     } else {
+//         qemu_log_mask(LOG_UNIMP, "CSR_UTVEC: reserved mode not supported\n");
+//     }
+//     return RISCV_EXCP_NONE;
+// }
 
-/* User Trap Handling */
-static int read_uscratch(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->uscratch;
-    return RISCV_EXCP_NONE;
-}
+// /* User Trap Handling */
+// static int read_uscratch(CPURISCVState *env, int csrno, target_ulong *val)
+// {
+//     *val = env->uscratch;
+//     return RISCV_EXCP_NONE;
+// }
 
-static int write_uscratch(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->uscratch = val;
-    return RISCV_EXCP_NONE;
-}
+// static int write_uscratch(CPURISCVState *env, int csrno, target_ulong val)
+// {
+//     env->uscratch = val;
+//     return RISCV_EXCP_NONE;
+// }
 
-static int read_uepc(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->uepc;
-    return RISCV_EXCP_NONE;
-}
+// static int read_uepc(CPURISCVState *env, int csrno, target_ulong *val)
+// {
+//     *val = env->uepc;
+//     return RISCV_EXCP_NONE;
+// }
 
-static int write_uepc(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->uepc = val;
-    return RISCV_EXCP_NONE;
-}
+// static int write_uepc(CPURISCVState *env, int csrno, target_ulong val)
+// {
+//     env->uepc = val;
+//     return RISCV_EXCP_NONE;
+// }
 
-static int read_ucause(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->ucause;
-    return RISCV_EXCP_NONE;
-}
+// static int read_ucause(CPURISCVState *env, int csrno, target_ulong *val)
+// {
+//     *val = env->ucause;
+//     return RISCV_EXCP_NONE;
+// }
 
-static int write_ucause(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->ucause = val;
-    return RISCV_EXCP_NONE;
-}
+// static int write_ucause(CPURISCVState *env, int csrno, target_ulong val)
+// {
+//     env->ucause = val;
+//     return RISCV_EXCP_NONE;
+// }
 
-static int read_utval(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->utval;
-    return RISCV_EXCP_NONE;
-}
+// static int read_utval(CPURISCVState *env, int csrno, target_ulong *val)
+// {
+//     *val = env->utval;
+//     return RISCV_EXCP_NONE;
+// }
 
-static int write_utval(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->utval = val;
-    return RISCV_EXCP_NONE;
-}
+// static int write_utval(CPURISCVState *env, int csrno, target_ulong val)
+// {
+//     env->utval = val;
+//     return RISCV_EXCP_NONE;
+// }
 
-static int rmw_uip(CPURISCVState *env, int csrno, target_ulong *ret_value,
-                   target_ulong new_value, target_ulong write_mask)
-{
-    int ret = rmw_mip(env, CSR_MSTATUS, ret_value, new_value,
-                      write_mask & env->sideleg & uip_writable_mask);
-    if (ret_value)
-        *ret_value &= env->sideleg;
-    return ret;
-}
+// static int rmw_uip(CPURISCVState *env, int csrno, target_ulong *ret_value,
+//                    target_ulong new_value, target_ulong write_mask)
+// {
+//     int ret = rmw_mip(env, CSR_MSTATUS, ret_value, new_value,
+//                       write_mask & env->sideleg & uip_writable_mask);
+//     if (ret_value)
+//         *ret_value &= env->sideleg;
+//     return ret;
+// }
 
 
 static int read_vstopi(CPURISCVState *env, int csrno, target_ulong *val)
@@ -4263,17 +4259,17 @@ static RISCVException write_dretpc(CPURISCVState *env, int csrno, target_ulong v
     return RISCV_EXCP_NONE;
 }
 
-static RISCVException read_dretpcactz(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->dasics_state.dretpcactz;
-    return RISCV_EXCP_NONE;
-}
+// static RISCVException read_dretpcactz(CPURISCVState *env, int csrno, target_ulong *val)
+// {
+//     *val = env->dasics_state.dretpcactz;
+//     return RISCV_EXCP_NONE;
+// }
 
-static RISCVException write_dretpcactz(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->dasics_state.dretpcactz = val;
-    return RISCV_EXCP_NONE;
-}
+// static RISCVException write_dretpcactz(CPURISCVState *env, int csrno, target_ulong val)
+// {
+//     env->dasics_state.dretpcactz = val;
+//     return RISCV_EXCP_NONE;
+// }
 
 static RISCVException read_dlcfg(CPURISCVState *env, int csrno, target_ulong *val)
 {
@@ -4405,41 +4401,41 @@ static RISCVException write_dlibjmplbound(CPURISCVState *env, int csrno, target_
     return RISCV_EXCP_NONE;
 }
 
-static RISCVException read_dsmbound(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    switch(csrno) {
-    case CSR_DSMBOUND0:
-        *val = env->dasics_state.smbound.lo;
-        break;
-    case CSR_DSMBOUND1:
-        *val = env->dasics_state.smbound.hi;
-        break;
-    default:
-        qemu_log_mask(LOG_GUEST_ERROR, \
-            "Ignoring dsmbound read: Out of range! csrno = %d\n", csrno);
-        break;
-    }
+// static RISCVException read_dsmbound(CPURISCVState *env, int csrno, target_ulong *val)
+// {
+//     switch(csrno) {
+//     case CSR_DSMBOUND0:
+//         *val = env->dasics_state.smbound.lo;
+//         break;
+//     case CSR_DSMBOUND1:
+//         *val = env->dasics_state.smbound.hi;
+//         break;
+//     default:
+//         qemu_log_mask(LOG_GUEST_ERROR,
+//             "Ignoring dsmbound read: Out of range! csrno = %d\n", csrno);
+//         break;
+//     }
 
-    return RISCV_EXCP_NONE;
-}
+//     return RISCV_EXCP_NONE;
+// }
 
-static RISCVException write_dsmbound(CPURISCVState *env, int csrno, target_ulong val)
-{
-    switch(csrno) {
-    case CSR_DSMBOUND0:
-        env->dasics_state.smbound.lo = val;
-        break;
-    case CSR_DSMBOUND1:
-        env->dasics_state.smbound.hi = val;
-        break;
-    default:
-        qemu_log_mask(LOG_GUEST_ERROR, \
-            "Ignoring dsmbound write: Out of range! csrno = %d\n", csrno);
-        break;
-    }
+// static RISCVException write_dsmbound(CPURISCVState *env, int csrno, target_ulong val)
+// {
+//     switch(csrno) {
+//     case CSR_DSMBOUND0:
+//         env->dasics_state.smbound.lo = val;
+//         break;
+//     case CSR_DSMBOUND1:
+//         env->dasics_state.smbound.hi = val;
+//         break;
+//     default:
+//         qemu_log_mask(LOG_GUEST_ERROR,
+//             "Ignoring dsmbound write: Out of range! csrno = %d\n", csrno);
+//         break;
+//     }
 
-    return RISCV_EXCP_NONE;
-}
+//     return RISCV_EXCP_NONE;
+// }
 
 static RISCVException read_dumbound(CPURISCVState *env, int csrno, target_ulong *val)
 {
@@ -4477,41 +4473,41 @@ static RISCVException write_dumbound(CPURISCVState *env, int csrno, target_ulong
     return RISCV_EXCP_NONE;
 }
 
-static RISCVException read_dsmcfg(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->dasics_state.maincfg & SMCFG_MASK;
-    return RISCV_EXCP_NONE; 
-}
+// static RISCVException read_dsmcfg(CPURISCVState *env, int csrno, target_ulong *val)
+// {
+//     *val = env->dasics_state.maincfg & SMCFG_MASK;
+//     return RISCV_EXCP_NONE; 
+// }
 
 static RISCVException write_dsmcfg(CPURISCVState *env, int csrno, target_ulong val)
 {
     // Perform CLS logic of dsmcfg first
-    bool val_scls = (val & MCFG_SCLS) != 0;
-    bool val_ucls = (val & MCFG_UCLS) != 0;
+    // bool val_scls = (val & MCFG_SCLS) != 0;
+    // bool val_ucls = (val & MCFG_UCLS) != 0;
 
-    if (val_scls) {
-        write_dumbound(env, CSR_DUMBOUND0, 0);
-        write_dumbound(env, CSR_DUMBOUND1, 0);
-    }
+    // if (val_scls) {
+    //     write_dumbound(env, CSR_DUMBOUND0, 0);
+    //     write_dumbound(env, CSR_DUMBOUND1, 0);
+    // }
 
     // Clear all dasics register
-    if (val_scls || val_ucls) {
-        write_dlcfg(env, CSR_DLCFG, 0);
-        for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
-            write_dlbound(env, CSR_DLBOUND0 + (i << 1), 0);
-            write_dlbound(env, CSR_DLBOUND1 + (i << 1), 0);
-        }
+    // if (val_scls || val_ucls) {
+    //     write_dlcfg(env, CSR_DLCFG, 0);
+    //     for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
+    //         write_dlbound(env, CSR_DLBOUND0 + (i << 1), 0);
+    //         write_dlbound(env, CSR_DLBOUND1 + (i << 1), 0);
+    //     }
 
-        write_dljmpcfg(env, CSR_DJMPCFG, 0);
-        for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
-            write_dlbound(env, CSR_DLIBJMPBOUND0 + (i << 1), 0);
-            write_dlbound(env, CSR_DLIBJMPBOUND1 + (i << 1), 0);
-        }        
+    //     write_dljmpcfg(env, CSR_DJMPCFG, 0);
+    //     for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
+    //         write_dlbound(env, CSR_DLIBJMPBOUND0 + (i << 1), 0);
+    //         write_dlbound(env, CSR_DLIBJMPBOUND1 + (i << 1), 0);
+    //     }        
 
-        write_dmaincall(env, CSR_DMAINCALL, 0);
-        write_dretpc(env, CSR_DRETPC, 0);
-        write_dretpcactz(env, CSR_DRETPCACTZ, 0);
-    }
+    //     write_dmaincall(env, CSR_DMAINCALL, 0);
+    //     write_dretpc(env, CSR_DRETPC, 0);
+    //     write_dretpcactz(env, CSR_DRETPCACTZ, 0);
+    // }
 
     // Then update dsmcfg itself. CLS bit has already taken effect, thus set to 0
     target_ulong mask = (csrno == CSR_DSMCFG) ? SMCFG_MASK : UMCFG_MASK;
@@ -4735,16 +4731,16 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_SATP]     = { "satp",     satp, read_satp,     write_satp     },
 
     /* User Trap Setup */
-    [CSR_USTATUS]   = {"ustatus",   uli, read_ustatus,      write_ustatus      },
-    [CSR_UIE]       = {"uie",       uli, read_uie,          write_uie          },
-    [CSR_UTVEC]     = {"utvec",     uli, read_utvec,        write_utvec        },    
+    // [CSR_USTATUS]   = {"ustatus",   uli, read_ustatus,      write_ustatus      },
+    // [CSR_UIE]       = {"uie",       uli, read_uie,          write_uie          },
+    // [CSR_UTVEC]     = {"utvec",     uli, read_utvec,        write_utvec        },    
 
-    /* User Trap Handling */
-    [CSR_USCRATCH]  = {"uscratch",  uli, read_uscratch,      write_uscratch     },
-    [CSR_UEPC]      = { "uepc",     uli, read_uepc,          write_uepc         },
-    [CSR_UCAUSE]    = { "ucause",   uli, read_ucause,        write_ucause       },
-    [CSR_UTVAL]     = { "utval",    uli, read_utval,         write_utval        },
-    [CSR_UIP]       = { "uip",      uli, NULL,       NULL,    rmw_uip           },
+    // /* User Trap Handling */
+    // [CSR_USCRATCH]  = {"uscratch",  uli, read_uscratch,      write_uscratch     },
+    // [CSR_UEPC]      = { "uepc",     uli, read_uepc,          write_uepc         },
+    // [CSR_UCAUSE]    = { "ucause",   uli, read_ucause,        write_ucause       },
+    // [CSR_UTVAL]     = { "utval",    uli, read_utval,         write_utval        },
+    // [CSR_UIP]       = { "uip",      uli, NULL,       NULL,    rmw_uip           },
 
     /* Supervisor-Level Window to Indirectly Accessed Registers (AIA) */
     [CSR_SISELECT]   = { "siselect",   aia_smode, NULL, NULL, rmw_xiselect },
@@ -5234,9 +5230,9 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
 #endif /* !CONFIG_USER_ONLY */
 
     /* DASICS Protection Mechanism */
-    [CSR_DSMCFG]         = {"dsmcfg",       dasics,     read_dsmcfg,    write_dsmcfg    },
-    [CSR_DSMBOUND0]      = {"dsmbound0",    dasics,     read_dsmbound,  write_dsmbound  },
-    [CSR_DSMBOUND1]      = {"dsmbound1",    dasics,     read_dsmbound,  write_dsmbound  },
+    // [CSR_DSMCFG]         = {"dsmcfg",       dasics,     read_dsmcfg,    write_dsmcfg    },
+    // [CSR_DSMBOUND0]      = {"dsmbound0",    dasics,     read_dsmbound,  write_dsmbound  },
+    // [CSR_DSMBOUND1]      = {"dsmbound1",    dasics,     read_dsmbound,  write_dsmbound  },
     
     [CSR_DUMCFG]         = {"dumcfg",       dasics,     read_dumcfg,    write_dumcfg    },
     [CSR_DUMBOUND0]      = {"dumbound0",    dasics,     read_dumbound,  write_dumbound  },
@@ -5252,45 +5248,45 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_DLBOUND5]       = {"dlbound5",     dasics,     read_dlbound,   write_dlbound   },
     [CSR_DLBOUND6]       = {"dlbound6",     dasics,     read_dlbound,   write_dlbound   },
     [CSR_DLBOUND7]       = {"dlbound7",     dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND8]       = {"dlbound8",     dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND9]       = {"dlbound9",     dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND10]      = {"dlbound10",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND11]      = {"dlbound11",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND12]      = {"dlbound12",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND13]      = {"dlbound13",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND14]      = {"dlbound14",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND15]      = {"dlbound15",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND16]      = {"dlbound16",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND17]      = {"dlbound17",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND18]      = {"dlbound18",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND19]      = {"dlbound19",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND20]      = {"dlbound20",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND21]      = {"dlbound21",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND22]      = {"dlbound22",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND23]      = {"dlbound23",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND24]      = {"dlbound24",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND25]      = {"dlbound25",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND26]      = {"dlbound26",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND27]      = {"dlbound27",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND28]      = {"dlbound28",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND29]      = {"dlbound29",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND30]      = {"dlbound30",    dasics,     read_dlbound,   write_dlbound   },
-    [CSR_DLBOUND31]      = {"dlbound31",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND8]       = {"dlbound8",     dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND9]       = {"dlbound9",     dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND10]      = {"dlbound10",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND11]      = {"dlbound11",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND12]      = {"dlbound12",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND13]      = {"dlbound13",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND14]      = {"dlbound14",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND15]      = {"dlbound15",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND16]      = {"dlbound16",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND17]      = {"dlbound17",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND18]      = {"dlbound18",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND19]      = {"dlbound19",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND20]      = {"dlbound20",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND21]      = {"dlbound21",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND22]      = {"dlbound22",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND23]      = {"dlbound23",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND24]      = {"dlbound24",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND25]      = {"dlbound25",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND26]      = {"dlbound26",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND27]      = {"dlbound27",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND28]      = {"dlbound28",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND29]      = {"dlbound29",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND30]      = {"dlbound30",    dasics,     read_dlbound,   write_dlbound   },
+    // [CSR_DLBOUND31]      = {"dlbound31",    dasics,     read_dlbound,   write_dlbound   },
 
 
     [CSR_DLIBJMPBOUND0]  = {"dlibjmpbound0",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
     [CSR_DLIBJMPBOUND1]  = {"dlibjmpbound1",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND2]  = {"dlibjmpbound2",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND3]  = {"dlibjmpbound3",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND4]  = {"dlibjmpbound4",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND5]  = {"dlibjmpbound5",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND6]  = {"dlibjmpbound6",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND7]  = {"dlibjmpbound7",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
+    // [CSR_DLIBJMPBOUND2]  = {"dlibjmpbound2",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
+    // [CSR_DLIBJMPBOUND3]  = {"dlibjmpbound3",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
+    // [CSR_DLIBJMPBOUND4]  = {"dlibjmpbound4",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
+    // [CSR_DLIBJMPBOUND5]  = {"dlibjmpbound5",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
+    // [CSR_DLIBJMPBOUND6]  = {"dlibjmpbound6",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
+    // [CSR_DLIBJMPBOUND7]  = {"dlibjmpbound7",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
     
     [CSR_DJMPCFG]        = {"djmpcfg",      dasics,     read_dljmpcfg,  write_dljmpcfg      },
 
     [CSR_DMAINCALL]      = {"dmaincall",    dasics,     read_dmaincall, write_dmaincall     },
     [CSR_DRETPC]         = {"dretpc",       dasics,     read_dretpc,    write_dretpc        },
-    [CSR_DRETPCACTZ]     = {"dretpcactz",   dasics,     read_dretpcactz,  write_dretpcactz  },
+    // [CSR_DRETPCACTZ]     = {"dretpcactz",   dasics,     read_dretpcactz,  write_dretpcactz  },
 
 };

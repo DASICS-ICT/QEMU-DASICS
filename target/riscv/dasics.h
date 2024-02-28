@@ -7,7 +7,7 @@
 #define MCFG_SENA           0x1ul
 
 #define SMCFG_MASK          0xf
-#define UMCFG_MASK          0xa
+#define UMCFG_MASK          0x2
 
 #define LIBCFG_MASK         0xbul
 #define LIBCFG_V            0x8ul
@@ -18,8 +18,8 @@
 #define LIBJMPCFG_MASK      0x0001ul
 #define LIBJMPCFG_V         0x0001ul
 
-#define MAX_DASICS_LIBBOUNDS 16
-#define MAX_DASICS_LIBJMPBOUNDS 4
+#define MAX_DASICS_LIBBOUNDS 4
+#define MAX_DASICS_LIBJMPBOUNDS 1
 
 typedef struct {
     target_ulong hi;
