@@ -572,7 +572,7 @@ void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong ad
 
     // Check whether target address is within dlibbounds
     if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_R)) {
-        uint32_t exception =(env->priv == PRV_U) ? FDIULoadAccessFault : RISCV_EXCP_LOAD_PAGE_FAULT;
+        uint32_t exception = FDIULoadAccessFault;
 
         env->badaddr = addr;
         riscv_raise_exception(env, exception, GETPC());
@@ -589,7 +589,7 @@ void helper_dasics_st_check(CPURISCVState *env, target_ulong pc, target_ulong ad
 
     // Check whether target address is within dlibbounds
     if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_W)) {
-        uint32_t exception = (env->priv == PRV_U) ? FDIUStoreAccessFault : RISCV_EXCP_STORE_PAGE_FAULT;
+        uint32_t exception = FDIUStoreAccessFault;
         env->badaddr = addr;
         riscv_raise_exception(env, exception, GETPC());
     }
