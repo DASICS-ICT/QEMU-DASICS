@@ -128,6 +128,7 @@ struct RISCVCPUConfig {
     bool epmp;
     bool debug;
     bool misa_w;
+    bool mpk;
 
     bool short_isa_string;
 

@@ -935,6 +935,10 @@ restart:
                 return TRANSLATE_FAIL;
             }
 
+            if (!riscv_cpu_cfg(env)->mpk && (pte & PTE_PKEY)) {
+                return TRANSLATE_FAIL;
+            }
+
             if (!pbmte && (pte & PTE_PBMT)) {
                 return TRANSLATE_FAIL;
             }
@@ -979,6 +983,20 @@ restart:
     case PTE_W:
     case PTE_W | PTE_X:
         return TRANSLATE_FAIL;
+    }
+
+    /* Check for protection keys */
+    if (riscv_cpu_cfg(env)->mpk) {
+        target_ulong pkr = get_field(env->spkctl, SPKCTL_PKE) ? env->upkru : 0;
+        target_ulong pkey = (pte & PTE_PKEY) >> PKEY_SHIFT;
+        target_ulong pkr_ad = (pkr >> pkey * 2) & PKR_AD;
+        target_ulong pkr_wd = (pkr >> pkey * 2) & PKR_WD;
+
+        if (pkr_ad && (access_type == MMU_DATA_LOAD || access_type == MMU_DATA_STORE)) {
+            return TRANSLATE_PKEY_FAIL;
+        } else if (pkr_wd && access_type == MMU_DATA_STORE) {
+            return TRANSLATE_PKEY_FAIL;
+        }
     }
 
     int prot = 0;
@@ -1096,8 +1114,8 @@ restart:
 
 static void raise_mmu_exception(CPURISCVState *env, target_ulong address,
                                 MMUAccessType access_type, bool pmp_violation,
-                                bool first_stage, bool two_stage,
-                                bool two_stage_indirect)
+                                bool pkey_violation, bool first_stage,
+                                bool two_stage, bool two_stage_indirect)
 {
     CPUState *cs = env_cpu(env);
     int page_fault_exceptions, vm;
@@ -1115,13 +1133,15 @@ static void raise_mmu_exception(CPURISCVState *env, target_ulong address,
         vm = get_field(env->hgatp, stap_mode);
     }
 
-    page_fault_exceptions = vm != VM_1_10_MBARE && !pmp_violation;
+    page_fault_exceptions = vm != VM_1_10_MBARE && !pmp_violation \
+                                && !pkey_violation;
 
     switch (access_type) {
     case MMU_INST_FETCH:
         if (env->virt_enabled && !first_stage) {
             cs->exception_index = RISCV_EXCP_INST_GUEST_PAGE_FAULT;
         } else {
+            assert(!pkey_violation);
             cs->exception_index = page_fault_exceptions ?
                 RISCV_EXCP_INST_PAGE_FAULT : RISCV_EXCP_INST_ACCESS_FAULT;
         }
@@ -1130,17 +1150,20 @@ static void raise_mmu_exception(CPURISCVState *env, target_ulong address,
         if (two_stage && !first_stage) {
             cs->exception_index = RISCV_EXCP_LOAD_GUEST_ACCESS_FAULT;
         } else {
-            cs->exception_index = page_fault_exceptions ?
-                RISCV_EXCP_LOAD_PAGE_FAULT : RISCV_EXCP_LOAD_ACCESS_FAULT;
+            cs->exception_index =
+                page_fault_exceptions ? RISCV_EXCP_LOAD_PAGE_FAULT :
+                pmp_violation         ? RISCV_EXCP_LOAD_ACCESS_FAULT :
+                                        RISCV_EXCP_PKU_LOAD_ACCESS_FAULT;
         }
         break;
     case MMU_DATA_STORE:
         if (two_stage && !first_stage) {
             cs->exception_index = RISCV_EXCP_STORE_GUEST_AMO_ACCESS_FAULT;
         } else {
-            cs->exception_index = page_fault_exceptions ?
-                RISCV_EXCP_STORE_PAGE_FAULT :
-                RISCV_EXCP_STORE_AMO_ACCESS_FAULT;
+            cs->exception_index =
+                page_fault_exceptions ? RISCV_EXCP_STORE_PAGE_FAULT :
+                pmp_violation         ? RISCV_EXCP_STORE_AMO_ACCESS_FAULT :
+                                        RISCV_EXCP_PKU_STORE_ACCESS_FAULT;
         }
         break;
     default:
@@ -1254,6 +1277,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     hwaddr pa = 0;
     int prot, prot2, prot_pmp;
     bool pmp_violation = false;
+    bool pkey_violation = false;
     bool first_stage_error = true;
     bool two_stage_lookup = mmuidx_2stage(mmu_idx);
     bool two_stage_indirect_error = false;
@@ -1357,6 +1381,10 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
         pmp_violation = true;
     }
 
+    if (ret == TRANSLATE_PKEY_FAIL) {
+        pkey_violation = true;
+    }
+
     if (ret == TRANSLATE_SUCCESS) {
         tlb_set_page(cs, address & ~(tlb_size - 1), pa & ~(tlb_size - 1),
                      prot, mmu_idx, tlb_size);
@@ -1365,8 +1393,8 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
         return false;
     } else {
         raise_mmu_exception(env, address, access_type, pmp_violation,
-                            first_stage_error, two_stage_lookup,
-                            two_stage_indirect_error);
+                            pkey_violation, first_stage_error,
+                            two_stage_lookup, two_stage_indirect_error);
         cpu_loop_exit_restore(cs, retaddr);
     }
 
@@ -1623,6 +1651,8 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         case RISCV_EXCP_STORE_AMO_ACCESS_FAULT:
         case RISCV_EXCP_LOAD_PAGE_FAULT:
         case RISCV_EXCP_STORE_PAGE_FAULT:
+        case RISCV_EXCP_PKU_LOAD_ACCESS_FAULT:
+        case RISCV_EXCP_PKU_STORE_ACCESS_FAULT:
             write_gva = env->two_stage_lookup;
             tval = env->badaddr;
             if (env->two_stage_indirect_lookup) {

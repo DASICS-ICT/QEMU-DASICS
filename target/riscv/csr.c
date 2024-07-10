@@ -540,6 +540,16 @@ static RISCVException debug(CPURISCVState *env, int csrno)
 
     return RISCV_EXCP_ILLEGAL_INST;
 }
+
+static RISCVException mpk(CPURISCVState *env, int csrno)
+{
+    /* The SV32 pte does not have more reserved bits for pkey */
+    if (riscv_cpu_cfg(env)->mpk && riscv_cpu_mxl(env) != MXL_RV32) {
+        return RISCV_EXCP_NONE;
+    }
+
+    return RISCV_EXCP_ILLEGAL_INST;
+}
 #endif
 
 static RISCVException seed(CPURISCVState *env, int csrno)
@@ -1150,7 +1160,9 @@ static const uint64_t all_ints = M_MODE_INTERRUPTS | S_MODE_INTERRUPTS |
                          (1ULL << (RISCV_EXCP_INST_GUEST_PAGE_FAULT)) | \
                          (1ULL << (RISCV_EXCP_LOAD_GUEST_ACCESS_FAULT)) | \
                          (1ULL << (RISCV_EXCP_VIRT_INSTRUCTION_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_STORE_GUEST_AMO_ACCESS_FAULT)))
+                         (1ULL << (RISCV_EXCP_STORE_GUEST_AMO_ACCESS_FAULT)) | \
+                         (1ULL << (RISCV_EXCP_PKU_LOAD_ACCESS_FAULT)) | \
+                         (1ULL << (RISCV_EXCP_PKU_STORE_ACCESS_FAULT)))
 static const target_ulong vs_delegable_excps = DELEGABLE_EXCPS &
     ~((1ULL << (RISCV_EXCP_S_ECALL)) |
       (1ULL << (RISCV_EXCP_VS_ECALL)) |
@@ -4063,6 +4075,41 @@ static RISCVException write_jvt(CPURISCVState *env, int csrno,
 }
 
 /*
+ * Memory Protection Keys for RISC-V
+ */
+static RISCVException read_upkru(CPURISCVState *env, int csrno,
+                                target_ulong *val)
+{
+    *val = env->upkru;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_upkru(CPURISCVState *env, int csrno,
+                                target_ulong val)
+{
+    target_ulong upkru = env->upkru;
+    target_ulong mask = ~(PKR_WD | PKR_AD);  // Reserve pkey0 as default
+    env->upkru = (upkru & ~mask) | (val & mask);
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_spkctl(CPURISCVState *env, int csrno,
+                                target_ulong *val)
+{
+    *val = env->spkctl;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_spkctl(CPURISCVState *env, int csrno,
+                                target_ulong val)
+{
+    target_ulong spkctl = env->spkctl;
+    target_ulong mask = SPKCTL_PKE;
+    env->spkctl = (spkctl & ~mask) | (val & mask);
+    return RISCV_EXCP_NONE;
+}
+
+/*
  * Control and Status Register function table
  * riscv_csr_operations::predicate() must be provided for an implemented CSR
  */
@@ -4411,6 +4458,10 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
                          write_spmmask                                      },
     [CSR_SPMBASE] =    { "spmbase", pointer_masking, read_spmbase,
                          write_spmbase                                      },
+
+    /* Memory Protection Keys */
+    [CSR_UPKRU]  =     { "upkru",  mpk, read_upkru,  write_upkru  },
+    [CSR_SPKCTL] =     { "spkctl", mpk, read_spkctl, write_spkctl },
 
     /* Performance Counters */
     [CSR_HPMCOUNTER3]    = { "hpmcounter3",    ctr,    read_hpmcounter },

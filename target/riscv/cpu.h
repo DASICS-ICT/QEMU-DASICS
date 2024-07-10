@@ -77,6 +77,7 @@ enum {
     TRANSLATE_SUCCESS,
     TRANSLATE_FAIL,
     TRANSLATE_PMP_FAIL,
+    TRANSLATE_PKEY_FAIL,
     TRANSLATE_G_STAGE_FAIL
 };
 
@@ -303,6 +304,10 @@ struct CPUArchState {
     /* physical memory protection */
     pmp_table_t pmp_state;
     target_ulong mseccfg;
+
+    /* memory protection keys */
+    target_ulong upkru;
+    target_ulong spkctl;
 
     /* trigger module */
     target_ulong trigger_cur;

@@ -140,6 +140,9 @@
 #define CSR_HPMCOUNTER30H   0xc9e
 #define CSR_HPMCOUNTER31H   0xc9f
 
+/* User-Level Protection Keys */
+#define CSR_UPKRU           0x800
+
 /* Machine Timers and Counters */
 #define CSR_MCYCLE          0xb00
 #define CSR_MINSTRET        0xb02
@@ -232,6 +235,9 @@
 /* Supervisor-Level High-Half CSRs (AIA) */
 #define CSR_SIEH            0x114
 #define CSR_SIPH            0x154
+
+/* Supervisor-Level Protection Keys */
+#define CSR_SPKCTL          0x9d0
 
 /* Hpervisor CSRs */
 #define CSR_HSTATUS         0x600
@@ -644,7 +650,8 @@ typedef enum {
 #define PTE_SOFT            0x300 /* Reserved for Software */
 #define PTE_PBMT            0x6000000000000000ULL /* Page-based memory types */
 #define PTE_N               0x8000000000000000ULL /* NAPOT translation */
-#define PTE_RESERVED        0x1FC0000000000000ULL /* Reserved bits */
+#define PTE_PKEY            0x07C0000000000000ULL /* Memory Protection Keys */
+#define PTE_RESERVED        0x1800000000000000ULL /* Reserved bits */
 #define PTE_ATTR            (PTE_N | PTE_PBMT) /* All attributes bits */
 
 /* Page table PPN shift amount */
@@ -655,6 +662,9 @@ typedef enum {
 
 /* Leaf page shift amount */
 #define PGSHIFT             12
+
+/* Page table protection key shift amount */
+#define PKEY_SHIFT          54
 
 /* Default Reset Vector adress */
 #define DEFAULT_RSTVEC      0x1000
@@ -682,6 +692,8 @@ typedef enum RISCVException {
     RISCV_EXCP_LOAD_GUEST_ACCESS_FAULT = 0x15,
     RISCV_EXCP_VIRT_INSTRUCTION_FAULT = 0x16,
     RISCV_EXCP_STORE_GUEST_AMO_ACCESS_FAULT = 0x17,
+    RISCV_EXCP_PKU_LOAD_ACCESS_FAULT = 0x20,
+    RISCV_EXCP_PKU_STORE_ACCESS_FAULT = 0x21,
 } RISCVException;
 
 #define RISCV_EXCP_INT_FLAG                0x80000000
@@ -899,4 +911,10 @@ typedef enum RISCVException {
 /* JVT CSR bits */
 #define JVT_MODE                           0x3F
 #define JVT_BASE                           (~0x3F)
+
+/* MPK related bits */
+#define SPKCTL_PKE                         0x1
+#define PKR_WD                             0x2
+#define PKR_AD                             0x1
+
 #endif
