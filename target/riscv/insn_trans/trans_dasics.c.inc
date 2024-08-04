@@ -92,3 +92,42 @@ static bool trans_dasicscalljr(DisasContext *ctx, arg_dasicscalljr *a)
 
     return true;
 }
+
+// dibndmv
+static bool trans_dibndmv(DisasContext *ctx, arg_dibndmv *a)
+{
+    TCGv rs1 = get_gpr(ctx, a->rs1, EXT_NONE);
+    TCGv rs2 = get_gpr(ctx, a->rs2, EXT_NONE);
+    TCGv_i32 imm = tcg_constant_i32(a->imm);
+
+    /* The helper may raise ILLEGAL_INSN -- record binv for unwind. */
+    decode_save_opc(ctx);
+
+    gen_helper_dasics_dibndmv(cpu_env, rs1, rs2, imm);
+
+    /* We may have changed important cpu state -- exit to main loop. */
+    gen_update_pc(ctx, ctx->cur_insn_len);
+    exit_tb(ctx);
+    ctx->base.is_jmp = DISAS_NORETURN;
+
+    return true;
+}
+
+// dibndquery
+static bool trans_dibndquery(DisasContext *ctx, arg_dibndquery *a)
+{
+    TCGv dest = dest_gpr(ctx, a->rd);
+    TCGv_i32 imm = tcg_constant_i32(a->imm);
+
+    /* The helper may raise ILLEGAL_INSN -- record binv for unwind. */
+    decode_save_opc(ctx);
+
+    gen_helper_dasics_dibndquery(dest, cpu_env, imm);
+    gen_set_gpr(ctx, a->rd, dest);
+
+    /* We may have changed important cpu state -- exit to main loop. */
+    gen_update_pc(ctx, ctx->cur_insn_len);
+    exit_tb(ctx);
+    ctx->base.is_jmp = DISAS_NORETURN;
+    return true;
+}

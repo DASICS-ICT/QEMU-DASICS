@@ -424,9 +424,18 @@
 
 #define CSR_DJMPCFG         0x8c8
 #define CSR_DMAINCALL       0x8b0
-#define CSR_DRETPC          0x8b1
 #define CSR_DRETPCACTZ      0x8b2
+#define CSR_DRETPC0         0x8b4
+#define CSR_DRETPC1         0x8b5
+#define CSR_DRETPC2         0x8b6
+#define CSR_DRETPC3         0x8b7
 
+#define CSR_DMLEVEL         0x8cc
+#define CSR_DJLEVEL         0x8cd
+#define CSR_DSCRATCHCFG     0x8d0
+#define CSR_DSCRATCHLO      0x8d2
+#define CSR_DSCRATCHHI      0x8d3
+#define CSR_DSCRATCHLVL     0x8d4
 
 /* Performance Counters */
 #define CSR_MHPMCOUNTER3    0xb03

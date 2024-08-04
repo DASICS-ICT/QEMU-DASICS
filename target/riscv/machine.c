@@ -386,8 +386,14 @@ static const VMStateDescription dasics_state = {
                              dasics_boundary, dasics_bound_t),
 
         VMSTATE_UINTTL(dmaincall, dasics_table_t),
-        VMSTATE_UINTTL(dretpc, dasics_table_t),
+        VMSTATE_UINTTL_ARRAY(dretpc, dasics_table_t, MAX_DASICS_LEVELS),
         VMSTATE_UINTTL(dretpcactz, dasics_table_t),
+
+        VMSTATE_UINT8_ARRAY(dmlevel, dasics_table_t, MAX_DASICS_LIBBOUNDS),
+        VMSTATE_UINT8_ARRAY(djlevel, dasics_table_t, MAX_DASICS_LIBJMPBOUNDS),
+        VMSTATE_UINT8(dscratchcfg, dasics_table_t),
+        VMSTATE_UINT8(dscratchlevel, dasics_table_t),
+        VMSTATE_STRUCT(dscratchbound, dasics_table_t, 0, dasics_boundary, dasics_bound_t),
         VMSTATE_END_OF_LIST()
     }
 };

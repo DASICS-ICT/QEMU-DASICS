@@ -571,7 +571,8 @@ void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong ad
     }
 
     // Check whether target address is within dlibbounds
-    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_R)) {
+    int level = dasics_get_jmp_level(env, pc);
+    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_R, level)) {
         uint32_t exception = (env->priv == PRV_U) ?
                                 RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT:
                                 RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT;
@@ -589,7 +590,8 @@ void helper_dasics_st_check(CPURISCVState *env, target_ulong pc, target_ulong ad
     }
 
     // Check whether target address is within dlibbounds
-    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_W)) {
+    int level = dasics_get_jmp_level(env, pc);
+    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_W, level)) {
         uint32_t exception = (env->priv == PRV_U) ?
                                 RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT:
                                 RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT;
@@ -600,20 +602,19 @@ void helper_dasics_st_check(CPURISCVState *env, target_ulong pc, target_ulong ad
 
 void helper_dasics_call(CPURISCVState *env, target_ulong pc, target_ulong newpc, target_ulong nextpc)
 {
-    int src_trusted = dasics_in_trusted_zone(env, pc);
-
-    // Only trusted area can call dasicscall
-    if (!src_trusted) {
-        uint32_t exception = (env->priv == PRV_U) ?
-                                RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT:
-                                RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT;
-        env->badaddr = newpc;
-        riscv_raise_exception(env, exception, GETPC());        
+    int level;
+    if (dasics_in_trusted_zone(env, pc)) {
+        level = 0;
+    } else {
+        int cur_level = dasics_get_jmp_level(env, pc);
+        if (cur_level + 1 >= MAX_DASICS_LEVELS) {
+            riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+        } else {
+            level = cur_level + 1;
+        }
     }
 
-    // Save nextpc
-    env->dasics_state.dretpc = nextpc;
-
+    env->dasics_state.dretpc[level] = nextpc;
 }
 
 void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong newpc, target_ulong nextpc)
@@ -623,25 +624,24 @@ void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong ne
     int src_trusted = dasics_in_trusted_zone(env, pc);
     // Trusted area can jump to anywhere and don't care target
     if (src_trusted) return;
-
     int dst_trusted = dasics_in_trusted_zone(env, newpc);
 
-    
+    int src_level = dasics_get_jmp_level(env, pc);
+    target_ulong src_dretpc = env->dasics_state.dretpc[src_level];
 
-    int src_activezone = 0;
     int dst_activezone = 0;
-    if (!src_trusted)
-        src_activezone = dasics_in_active_zone(env, pc);
     if (!dst_trusted)
-        dst_activezone = dasics_in_active_zone(env, newpc);
+        dst_activezone = dasics_in_active_zone(env, newpc, src_level);
 
     int allow_lib_to_main = !src_trusted && dst_trusted &&
-        (newpc == env->dasics_state.dretpc || newpc == env->dasics_state.dmaincall);
-    int allow_activezone_to_lib = src_activezone && !dst_trusted &&
+        (newpc == src_dretpc || newpc == env->dasics_state.dmaincall);
+    int allow_activezone_to_lib = !dst_trusted &&
         !dst_activezone && (newpc == env->dasics_state.dretpcactz);
+    int allow_lib_to_lib = !src_trusted && !dst_trusted && newpc == src_dretpc;
 
     int allow_brjp = src_trusted  || allow_lib_to_main ||
-                     dst_activezone || allow_activezone_to_lib;
+                     dst_activezone || allow_activezone_to_lib ||
+                     allow_lib_to_lib;
 
     if (!allow_brjp) {
         uint32_t exception = (env->priv == PRV_U) ?
@@ -653,12 +653,141 @@ void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong ne
 
 
     // Set dretpcfz when redirect from active zone to untrusted, if not dasicsret
-    if ( !src_trusted && \
-         !src_activezone && \
-         dst_activezone) {
+    if (!src_trusted && dst_activezone) {
         env->dasics_state.dretpcactz = nextpc;
     }
 
+}
+
+void helper_dasics_dibndmv(CPURISCVState *env, target_ulong src_idx, target_ulong dst_idx, int type)
+{
+    // Check arguments
+    if (type != BNDMV_MEM && type != BNDMV_JMP) {
+        riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+    }
+    else if (type == BNDMV_MEM) {
+        if (src_idx >= MAX_DASICS_LIBBOUNDS || dst_idx >= MAX_DASICS_LIBBOUNDS) {
+            riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+        }
+    } else {
+        if ((src_idx >= MAX_DASICS_LIBJMPBOUNDS && src_idx != DIBNDMV_SCRATCH_IDX) ||
+            (dst_idx >= MAX_DASICS_LIBJMPBOUNDS && dst_idx != DIBNDMV_SCRATCH_IDX)) {
+            riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+        }
+    }
+
+    // Check levels
+    int trusted = dasics_in_trusted_zone(env, env->pc);
+    int cur_level = dasics_get_jmp_level(env, env->pc);
+    if (!trusted) {
+        if (cur_level + 1 >= MAX_DASICS_LEVELS) {
+            riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+        }
+
+        int src_level, dst_level, dst_empty;
+        if (type == BNDMV_MEM) {
+            src_level = env->dasics_state.dmlevel[src_idx];
+            dst_level = env->dasics_state.dmlevel[dst_idx];
+            dst_empty = (env->dasics_state.libcfg[dst_idx] & LIBCFG_V) == 0;
+            if (cur_level > src_level || (!dst_empty && cur_level >= dst_level)) {
+                riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+            }
+        } else {
+            src_level = env->dasics_state.djlevel[src_idx];
+            dst_level = env->dasics_state.djlevel[dst_idx];
+            dst_empty = (env->dasics_state.libjmpcfg[dst_idx] & LIBJMPCFG_V) == 0;
+            if (cur_level > src_level || (!dst_empty && cur_level >= dst_level)) {
+                riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+            }
+        }
+    }
+
+    // Perform dasics bounds move
+    uint8_t src_cfg;
+    int next_level = trusted ? 0 : cur_level + 1;
+    target_ulong src_boundlo, src_boundhi;
+    if (type == BNDMV_MEM) {
+        src_cfg = env->dasics_state.libcfg[src_idx];
+        env->dasics_state.libcfg[dst_idx] = src_cfg;
+        env->dasics_state.libbound[dst_idx].lo = env->dasics_state.libbound[src_idx].lo;
+        env->dasics_state.libbound[dst_idx].hi = env->dasics_state.libbound[src_idx].hi;
+        env->dasics_state.dmlevel[dst_idx] = next_level;
+    } else {
+        if (src_idx == DIBNDMV_SCRATCH_IDX) {
+            src_cfg = env->dasics_state.dscratchcfg;
+            src_boundlo = env->dasics_state.dscratchbound.lo;
+            src_boundhi = env->dasics_state.dscratchbound.hi;
+        } else {
+            src_cfg = env->dasics_state.libjmpcfg[src_idx];
+            src_boundlo = env->dasics_state.libjmpbound[src_idx].lo;
+            src_boundhi = env->dasics_state.libjmpbound[src_idx].hi;
+        }
+
+        if (dst_idx == DIBNDMV_SCRATCH_IDX) {
+            env->dasics_state.dscratchcfg = src_cfg;
+            env->dasics_state.dscratchbound.lo = src_boundlo;
+            env->dasics_state.dscratchbound.hi = src_boundhi;
+            env->dasics_state.dscratchlevel = next_level;
+        } else {
+            env->dasics_state.libjmpcfg[dst_idx] = src_cfg;
+            env->dasics_state.libjmpbound[dst_idx].lo = src_boundlo;
+            env->dasics_state.libjmpbound[dst_idx].hi = src_boundhi;
+            env->dasics_state.djlevel[dst_idx] = next_level;
+        }
+    }
+}
+
+target_ulong helper_dasics_dibndquery(CPURISCVState *env, int type)
+{
+    int cur_level = dasics_get_jmp_level(env, env->pc);
+    assert(0 <= cur_level && cur_level < MAX_DASICS_LEVELS);
+    target_ulong result = 0;
+
+    switch (type) {
+    case BNDQUERY_MEM:
+        for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
+            int level = dasics_get_mem_level_from_idx(env, i);
+            uint8_t cfgval = env->dasics_state.libcfg[i];
+            target_ulong temp = 0;
+            if (!(cfgval & LIBCFG_V)) {
+                temp = BNDQUERY_EMPTY;
+            } else {
+                if (level < cur_level) {
+                    temp = BNDQUERY_DENY;
+                } else if (level == cur_level) {
+                    temp = BNDQUERY_RO;
+                } else {
+                    temp = BNDQUERY_RW;
+                }
+            }
+            result |= temp << (i << 1);
+        }
+        break;
+    case BNDQUERY_JMP:
+        for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
+            int level = dasics_get_jmp_level_from_idx(env, i);
+            uint8_t cfgval = env->dasics_state.libjmpcfg[i];
+            target_ulong temp = 0;
+            if (!(cfgval & LIBJMPCFG_V)) {
+                temp = BNDQUERY_EMPTY;
+            } else {
+                if (level < cur_level) {
+                    temp = BNDQUERY_DENY;
+                } else if (level == cur_level) {
+                    temp = BNDQUERY_RO;
+                } else {
+                    temp = BNDQUERY_RW;
+                }
+            }
+            result |= temp << (i << 1);
+        }
+        break;
+    default:
+        riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+        break;
+    }
+
+    return result;
 }
 
 #endif /* !CONFIG_USER_ONLY */

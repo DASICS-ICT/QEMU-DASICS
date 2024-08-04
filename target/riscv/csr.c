@@ -4071,7 +4071,8 @@ static inline RISCVException riscv_csrrw_check(CPURISCVState *env,
         return RISCV_EXCP_ILLEGAL_INST;
     }
 
-    if (effective_priv == PRV_U && !dasics_in_trusted_zone(env, env->pc)) {
+    if (effective_priv == PRV_U && !dasics_in_trusted_zone(env, env->pc) &&
+            !dasics_access_lib_csrs(csrno)) {
         return RISCV_EXCP_ILLEGAL_INST;
     }
 #endif
@@ -4253,13 +4254,25 @@ static RISCVException write_dmaincall(CPURISCVState *env, int csrno, target_ulon
 
 static RISCVException read_dretpc(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    *val = env->dasics_state.dretpc;
+    if (csrno < CSR_DRETPC0 || csrno > CSR_DRETPC3) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                "Ignoring dretpc read: Out of range! csrno = %d\n", csrno);
+    } else {
+        *val = env->dasics_state.dretpc[csrno - CSR_DRETPC0];
+    }
+
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException write_dretpc(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->dasics_state.dretpc = val;
+    if (csrno < CSR_DRETPC0 || csrno > CSR_DRETPC3) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                "Ignoring dretpc write: Out of range! csrno = %d\n", csrno);
+    } else {
+        env->dasics_state.dretpc[csrno - CSR_DRETPC0] = val;
+    }
+
     return RISCV_EXCP_NONE;
 }
 
@@ -4277,6 +4290,10 @@ static RISCVException write_dretpcactz(CPURISCVState *env, int csrno, target_ulo
 
 static RISCVException read_dlcfg(CPURISCVState *env, int csrno, target_ulong *val)
 {
+    int trusted = dasics_in_trusted_zone(env, env->pc);
+    int curLevel = dasics_get_jmp_level(env, env->pc);
+    assert(0 <= curLevel && curLevel < MAX_DASICS_LEVELS);
+
     uint32_t step = 4;  // RV64
     target_ulong cfgval = 0;
     target_ulong _val = 0;
@@ -4284,6 +4301,9 @@ static RISCVException read_dlcfg(CPURISCVState *env, int csrno, target_ulong *va
     // Each libcfg contains 8 tiny configs
     for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
         cfgval = env->dasics_state.libcfg[i] & LIBCFG_MASK;
+        if (!(trusted || ((cfgval & LIBCFG_V) && curLevel <= dasics_get_mem_level_from_idx(env, i)))) {
+            cfgval = 0;
+        }
         _val |= (cfgval << (i * step));
     }
     *val = _val;
@@ -4293,13 +4313,19 @@ static RISCVException read_dlcfg(CPURISCVState *env, int csrno, target_ulong *va
 
 static RISCVException write_dlcfg(CPURISCVState *env, int csrno, target_ulong val)
 {
+    int trusted = dasics_in_trusted_zone(env, env->pc);
+    int curLevel = dasics_get_jmp_level(env, env->pc);
+    assert(0 <= curLevel && curLevel < MAX_DASICS_LEVELS);
+
     uint32_t step = 4;  // RV64
     uint8_t cfgval = 0;
 
     // Each libcfg contains 8 tiny configs
     for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
         cfgval = (val >> (step * i)) & LIBCFG_MASK;
-        env->dasics_state.libcfg[i] = cfgval;
+        if (trusted || ((cfgval & LIBCFG_V) && curLevel < dasics_get_mem_level_from_idx(env, i))) {
+            env->dasics_state.libcfg[i] = cfgval;
+        }
     }
 
     return RISCV_EXCP_NONE;
@@ -4308,6 +4334,18 @@ static RISCVException write_dlcfg(CPURISCVState *env, int csrno, target_ulong va
 static RISCVException read_dlbound(CPURISCVState *env, int csrno, target_ulong *val)
 {
     int idx = csrno - CSR_DLBOUND0;
+    int level = dasics_get_mem_level_from_idx(env, idx >> 1);
+    int curLevel = dasics_get_jmp_level(env, env->pc);
+    assert(0 <= curLevel && curLevel < MAX_DASICS_LEVELS);
+
+    if (!dasics_in_trusted_zone(env, env->pc)) {
+        if (!(env->dasics_state.libcfg[idx >> 1] & LIBCFG_V)) {
+            return RISCV_EXCP_ILLEGAL_INST;
+        }
+        if (curLevel > level) {
+            return RISCV_EXCP_ILLEGAL_INST;
+        }
+    }
 
     if (0 <= idx && idx < (MAX_DASICS_LIBBOUNDS << 1)) {
         *val = !(idx & 0x1) ? env->dasics_state.libbound[idx >> 1].lo:
@@ -4323,6 +4361,18 @@ static RISCVException read_dlbound(CPURISCVState *env, int csrno, target_ulong *
 static RISCVException write_dlbound(CPURISCVState *env, int csrno, target_ulong val)
 {
     int idx = csrno - CSR_DLBOUND0;
+    int level = dasics_get_mem_level_from_idx(env, idx >> 1);
+    int curLevel = dasics_get_jmp_level(env, env->pc);
+    assert(0 <= curLevel && curLevel < MAX_DASICS_LEVELS);
+
+    if (!dasics_in_trusted_zone(env, env->pc)) {
+        if (!(env->dasics_state.libcfg[idx >> 1] & LIBCFG_V)) {
+            return RISCV_EXCP_ILLEGAL_INST;
+        }
+        if (curLevel >= level) {
+            return RISCV_EXCP_ILLEGAL_INST;
+        }
+    }
 
     if (0 <= idx && idx < (MAX_DASICS_LIBBOUNDS << 1)) {
         if (!(idx & 0x1)) {
@@ -4340,14 +4390,18 @@ static RISCVException write_dlbound(CPURISCVState *env, int csrno, target_ulong 
 
 static RISCVException read_dljmpcfg(CPURISCVState *env, int csrno, target_ulong *val)
 {
+    int trusted = dasics_in_trusted_zone(env, env->pc);
+    int curLevel = dasics_get_jmp_level(env, env->pc);
+    assert(0 <= curLevel && curLevel < MAX_DASICS_LEVELS);
+
     uint32_t step = 16;
-    
     target_ulong cfgval = 0;
     target_ulong _val = 0;
 
     // Each libjmpcfg contains 16 tiny configs
     for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
-        cfgval = env->dasics_state.libjmpcfg[i] & LIBJMPCFG_MASK;
+        cfgval = (trusted || curLevel <= dasics_get_jmp_level_from_idx(env, i)) ?
+                    (env->dasics_state.libjmpcfg[i] & LIBJMPCFG_MASK) : 0;
         _val |= (cfgval << (i * step));
     }
 
@@ -4358,14 +4412,18 @@ static RISCVException read_dljmpcfg(CPURISCVState *env, int csrno, target_ulong 
 
 static RISCVException write_dljmpcfg(CPURISCVState *env, int csrno, target_ulong val)
 {
-    uint32_t step = 16;  // RV64
+    int trusted = dasics_in_trusted_zone(env, env->pc);
+    int curLevel = dasics_get_jmp_level(env, env->pc);
 
+    uint32_t step = 16;  // RV64
     uint8_t cfgval = 0;
 
     // Each libjmpcfg contains 16 tiny configs
     for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
         cfgval = (val >> (step * i)) & LIBJMPCFG_MASK;
-        env->dasics_state.libjmpcfg[i] = cfgval;
+        if (trusted || curLevel < dasics_get_jmp_level_from_idx(env, i)) {
+            env->dasics_state.libjmpcfg[i] = cfgval;
+        }
     }
 
     return RISCV_EXCP_NONE;
@@ -4375,6 +4433,13 @@ static RISCVException write_dljmpcfg(CPURISCVState *env, int csrno, target_ulong
 static RISCVException read_dlibjmpbound(CPURISCVState *env, int csrno, target_ulong *val)
 {
     int idx = csrno - CSR_DLIBJMPBOUND0;
+    int level = dasics_get_jmp_level_from_idx(env, idx >> 1);
+    int curLevel = dasics_get_jmp_level(env, env->pc);
+    assert(0 <= curLevel && curLevel < MAX_DASICS_LEVELS);
+
+    if (!dasics_in_trusted_zone(env, env->pc) && curLevel > level) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
 
     if (0 <= idx && idx < (MAX_DASICS_LIBJMPBOUNDS << 1)) {
         *val = !(idx & 0x1) ? env->dasics_state.libjmpbound[idx >> 1].lo:
@@ -4389,6 +4454,10 @@ static RISCVException read_dlibjmpbound(CPURISCVState *env, int csrno, target_ul
 
 static RISCVException write_dlibjmplbound(CPURISCVState *env, int csrno, target_ulong val)
 {
+    if (!dasics_in_trusted_zone(env, env->pc)) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+
     int idx = csrno - CSR_DLIBJMPBOUND0;
 
     if (0 <= idx && idx < (MAX_DASICS_LIBJMPBOUNDS << 1)) {
@@ -4402,6 +4471,156 @@ static RISCVException write_dlibjmplbound(CPURISCVState *env, int csrno, target_
                 "Ignoring dlibjmplbound write: Out of range! csrno = %d\n", csrno);
     }
 
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_dmlevel(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    uint32_t step = 2;
+    target_ulong level = 0;
+    target_ulong _val = 0;
+
+    for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
+        level = env->dasics_state.dmlevel[i] & LEVEL_MASK;
+        _val |= (level << (i * step));
+    }
+    *val = _val;
+
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_dmlevel(CPURISCVState *env, int csrno, target_ulong val)
+{
+    uint32_t step = 2;
+    uint8_t level = 0;
+
+    for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
+        level = (val >> (step * i)) & LEVEL_MASK;
+        env->dasics_state.dmlevel[i] = level;
+    }
+
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_djlevel(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    uint32_t step = 2;
+    target_ulong level = 0;
+    target_ulong _val = 0;
+
+    for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
+        level = env->dasics_state.djlevel[i] & LEVEL_MASK;
+        _val |= (level << (i * step));
+    }
+    *val = _val;
+
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_djlevel(CPURISCVState *env, int csrno, target_ulong val)
+{
+    uint32_t step = 2;
+    uint8_t level = 0;
+
+    for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
+        level = (val >> (step * i)) & LEVEL_MASK;
+        env->dasics_state.djlevel[i] = level;
+    }
+
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_dscratchcfg(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    if (!dasics_in_trusted_zone(env, env->pc) &&
+            dasics_get_jmp_level(env, env->pc) >= dasics_get_scratch_level(env)) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+
+    *val = env->dasics_state.dscratchcfg & LIBJMPCFG_MASK;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_dscratchcfg(CPURISCVState *env, int csrno, target_ulong val)
+{
+    if (dasics_in_trusted_zone(env, env->pc)) {
+        env->dasics_state.dscratchcfg =
+            (env->dasics_state.dscratchcfg & (~LIBJMPCFG_MASK)) | (val & LIBJMPCFG_MASK);
+        return RISCV_EXCP_NONE;
+    } else {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+}
+
+static RISCVException read_dscratchbnd(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    if (csrno != CSR_DSCRATCHLO && csrno != CSR_DSCRATCHHI) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+            "Ignoring dscratchbnd read: Out of range! csrno = %d\n", csrno);
+    }
+
+    if (!dasics_in_trusted_zone(env, env->pc)) {
+        if (!(env->dasics_state.dscratchcfg & LIBJMPCFG_V)) {
+            return RISCV_EXCP_ILLEGAL_INST;
+        }
+
+        if (dasics_get_jmp_level(env, env->pc) >= dasics_get_scratch_level(env)) {
+            return RISCV_EXCP_ILLEGAL_INST;
+        }
+    }
+
+    if (csrno == CSR_DSCRATCHLO) {
+        *val = env->dasics_state.dscratchbound.lo;
+    } else {
+        *val = env->dasics_state.dscratchbound.hi;
+    }
+
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_dscratchbnd(CPURISCVState *env, int csrno, target_ulong val)
+{
+    if (csrno != CSR_DSCRATCHLO && csrno != CSR_DSCRATCHHI) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+            "Ignoring dscratchbnd write: Out of range! csrno = %d\n", csrno);
+    }
+
+    if (!dasics_in_trusted_zone(env, env->pc)) {
+        if (!(env->dasics_state.dscratchcfg & LIBJMPCFG_V)) {
+            return RISCV_EXCP_ILLEGAL_INST;
+        }
+
+        if (dasics_get_jmp_level(env, env->pc) >= dasics_get_scratch_level(env)) {
+            return RISCV_EXCP_ILLEGAL_INST;
+        }
+
+        if (csrno == CSR_DSCRATCHLO && val < env->dasics_state.dscratchbound.lo) {
+            return RISCV_EXCP_ILLEGAL_INST;
+        }
+
+        if (csrno == CSR_DSCRATCHHI && val > env->dasics_state.dscratchbound.hi) {
+            return RISCV_EXCP_ILLEGAL_INST;
+        }
+    }
+
+    if (csrno == CSR_DSCRATCHLO) {
+        env->dasics_state.dscratchbound.lo = val;
+    } else {
+        env->dasics_state.dscratchbound.hi = val;
+    }
+
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_dscratchlvl(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->dasics_state.dscratchlevel;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_dscratchlvl(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->dasics_state.dscratchlevel = val;
     return RISCV_EXCP_NONE;
 }
 
@@ -4504,12 +4723,12 @@ static RISCVException write_dsmcfg(CPURISCVState *env, int csrno, target_ulong v
 
         write_dljmpcfg(env, CSR_DJMPCFG, 0);
         for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
-            write_dlbound(env, CSR_DLIBJMPBOUND0 + (i << 1), 0);
-            write_dlbound(env, CSR_DLIBJMPBOUND1 + (i << 1), 0);
+            write_dlibjmplbound(env, CSR_DLIBJMPBOUND0 + (i << 1), 0);
+            write_dlibjmplbound(env, CSR_DLIBJMPBOUND1 + (i << 1), 0);
         }        
 
         write_dmaincall(env, CSR_DMAINCALL, 0);
-        write_dretpc(env, CSR_DRETPC, 0);
+        write_dretpc(env, CSR_DRETPC0, 0);
         write_dretpcactz(env, CSR_DRETPCACTZ, 0);
     }
 
@@ -5290,7 +5509,16 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_DJMPCFG]        = {"djmpcfg",      dasics,     read_dljmpcfg,  write_dljmpcfg      },
 
     [CSR_DMAINCALL]      = {"dmaincall",    dasics,     read_dmaincall, write_dmaincall     },
-    [CSR_DRETPC]         = {"dretpc",       dasics,     read_dretpc,    write_dretpc        },
+    [CSR_DRETPC0]        = {"dretpc0",      dasics,     read_dretpc,    write_dretpc        },
+    [CSR_DRETPC1]        = {"dretpc1",      dasics,     read_dretpc,    write_dretpc        },
+    [CSR_DRETPC2]        = {"dretpc2",      dasics,     read_dretpc,    write_dretpc        },
+    [CSR_DRETPC3]        = {"dretpc3",      dasics,     read_dretpc,    write_dretpc        },
     [CSR_DRETPCACTZ]     = {"dretpcactz",   dasics,     read_dretpcactz,  write_dretpcactz  },
 
+    [CSR_DMLEVEL]        = {"dmlevel",      dasics,     read_dmlevel,     write_dmlevel     },
+    [CSR_DJLEVEL]        = {"djlevel",      dasics,     read_djlevel,     write_djlevel     },
+    [CSR_DSCRATCHCFG]    = {"dscratchcfg",  dasics,     read_dscratchcfg, write_dscratchcfg },
+    [CSR_DSCRATCHLO]     = {"dscratchlo",   dasics,     read_dscratchbnd, write_dscratchbnd },
+    [CSR_DSCRATCHHI]     = {"dscratchhi",   dasics,     read_dscratchbnd, write_dscratchbnd },
+    [CSR_DSCRATCHLVL]    = {"dscratchlvl",  dasics,     read_dscratchlvl, write_dscratchlvl },
 };
