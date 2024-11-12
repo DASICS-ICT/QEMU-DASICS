@@ -46,7 +46,7 @@ int dasics_in_active_zone(CPURISCVState *env, target_ulong pc)
         uint8_t cfgval = env->dasics_state.libjmpcfg[i];
         target_ulong boundhi = env->dasics_state.libjmpbound[i].hi;
         target_ulong boundlo = env->dasics_state.libjmpbound[i].lo;
-        if ((cfgval & LIBJMPCFG_V) && boundlo <= pc && pc <= boundhi) {
+        if ((cfgval & LIBJMPCFG_V) && boundlo <= pc && pc < boundhi) {
             withinRange = 1;
             break;
         }
@@ -67,7 +67,7 @@ int dasics_match_dlib(CPURISCVState *env, target_ulong addr, target_ulong cfg) {
         uint8_t cfgval = env->dasics_state.libcfg[i];
         target_ulong boundhi = env->dasics_state.libbound[i].hi;
         target_ulong boundlo = env->dasics_state.libbound[i].lo;
-        if (!((cfgval & cfg) ^ cfg) && boundlo <= addr && addr <= boundhi) {
+        if (!((cfgval & cfg) ^ cfg) && boundlo <= addr && addr < boundhi) {
             withinRange = 1;
             break;
         }
