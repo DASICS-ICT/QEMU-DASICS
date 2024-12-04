@@ -571,11 +571,14 @@ void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong ad
     }
 
     // Check whether target address is within dlibbounds
-    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_R)) {
+    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_R) && 
+        ((env->priv == PRV_U && !(env->dasics_state.maincfg & MCFG_CULT)) ||
+         (env->priv == PRV_S && !(env->dasics_state.maincfg & MCFG_CSLT)))) {
         uint32_t exception = (env->priv == PRV_U) ?
-                                RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT:
-                                RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT;
+                                RISCV_EXCP_DASICS_U_CHECK_FAULT:
+                                RISCV_EXCP_DASICS_S_CHECK_FAULT;
         env->badaddr = addr;
+        env->dasics_state.dfreason = DFR_LF;
         riscv_raise_exception(env, exception, GETPC());
     }
 }
@@ -589,11 +592,14 @@ void helper_dasics_st_check(CPURISCVState *env, target_ulong pc, target_ulong ad
     }
 
     // Check whether target address is within dlibbounds
-    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_W)) {
+    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_W) && 
+        ((env->priv == PRV_U && !(env->dasics_state.maincfg & MCFG_CUST)) ||
+         (env->priv == PRV_S && !(env->dasics_state.maincfg & MCFG_CSST)))) {
         uint32_t exception = (env->priv == PRV_U) ?
-                                RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT:
-                                RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT;
+                                RISCV_EXCP_DASICS_U_CHECK_FAULT:
+                                RISCV_EXCP_DASICS_S_CHECK_FAULT;
         env->badaddr = addr;
+        env->dasics_state.dfreason = DFR_SF;
         riscv_raise_exception(env, exception, GETPC());
     }
 }
@@ -603,11 +609,14 @@ void helper_dasics_call(CPURISCVState *env, target_ulong pc, target_ulong newpc,
     int src_trusted = dasics_in_trusted_zone(env, pc);
 
     // Only trusted area can call dasicscall
-    if (!src_trusted) {
+    if (!src_trusted && 
+        ((env->priv == PRV_U && !(env->dasics_state.maincfg & MCFG_CUFT)) ||
+         (env->priv == PRV_S && !(env->dasics_state.maincfg & MCFG_CSFT)))) {
         uint32_t exception = (env->priv == PRV_U) ?
-                                RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT:
-                                RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT;
+                                RISCV_EXCP_DASICS_U_CHECK_FAULT:
+                                RISCV_EXCP_DASICS_S_CHECK_FAULT;
         env->badaddr = newpc;
+        env->dasics_state.dfreason = DFR_JF;
         riscv_raise_exception(env, exception, GETPC());        
     }
 
@@ -643,11 +652,14 @@ void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong ne
     int allow_brjp = src_trusted  || allow_lib_to_main ||
                      dst_activezone || allow_activezone_to_lib;
 
-    if (!allow_brjp) {
+    if (!allow_brjp && 
+        ((env->priv == PRV_U && !(env->dasics_state.maincfg & MCFG_CUFT)) ||
+         (env->priv == PRV_S && !(env->dasics_state.maincfg & MCFG_CSFT)))) {
         uint32_t exception = (env->priv == PRV_U) ?
-                                RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT:
-                                RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT;
+                                RISCV_EXCP_DASICS_U_CHECK_FAULT:
+                                RISCV_EXCP_DASICS_S_CHECK_FAULT;
         env->badaddr = newpc;
+        env->dasics_state.dfreason = DFR_JF;
         riscv_raise_exception(env, exception, GETPC());
     }
 

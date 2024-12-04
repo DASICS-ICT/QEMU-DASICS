@@ -388,6 +388,7 @@ static const VMStateDescription dasics_state = {
         VMSTATE_UINTTL(dmaincall, dasics_table_t),
         VMSTATE_UINTTL(dretpc, dasics_table_t),
         VMSTATE_UINTTL(dretpcactz, dasics_table_t),
+        VMSTATE_UINTTL(dfreason, dasics_table_t),
         VMSTATE_END_OF_LIST()
     }
 };
@@ -433,6 +434,7 @@ const VMStateDescription vmstate_riscv_cpu = {
         VMSTATE_UINTTL(env.uepc, RISCVCPU),
         VMSTATE_UINTTL(env.ucause, RISCVCPU),
         VMSTATE_UINTTL(env.utval, RISCVCPU),
+        VMSTATE_UINTTL(env.utimer, RISCVCPU),
         VMSTATE_UINTTL(env.stvec, RISCVCPU),
         VMSTATE_UINTTL(env.sepc, RISCVCPU),
         VMSTATE_UINTTL(env.scause, RISCVCPU),

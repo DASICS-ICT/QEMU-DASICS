@@ -53,7 +53,7 @@
 #define CSR_UCAUSE          0x042
 #define CSR_UTVAL           0x043
 #define CSR_UIP             0x044
-
+#define CSR_UTIMER			0x045
 /* User Floating-Point CSRs */
 #define CSR_FFLAGS          0x001
 #define CSR_FRM             0x002
@@ -426,7 +426,7 @@
 #define CSR_DMAINCALL       0x8b0
 #define CSR_DRETPC          0x8b1
 #define CSR_DRETPCACTZ      0x8b2
-
+#define CSR_DFREASON          0x8b3
 
 /* Performance Counters */
 #define CSR_MHPMCOUNTER3    0xb03
@@ -747,18 +747,17 @@ typedef enum RISCVException {
     RISCV_EXCP_LOAD_GUEST_ACCESS_FAULT = 0x15,
     RISCV_EXCP_VIRT_INSTRUCTION_FAULT = 0x16,
     RISCV_EXCP_STORE_GUEST_AMO_ACCESS_FAULT = 0x17,
-    RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT = 0x18,
-    RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT = 0x19,
-    RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT = 0x1a,
-    RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT = 0x1b,
-    RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT = 0x1c,
-    RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT = 0x1d,
-    RISCV_EXCP_DASICS_U_ECALL_FAULT = 0x1e,
-    RISCV_EXCP_DASICS_S_ECALL_FAULT = 0x1f,
+    RISCV_EXCP_DASICS_U_CHECK_FAULT = 0x18,
+    RISCV_EXCP_DASICS_S_CHECK_FAULT = 0x19,
 } RISCVException;
 
 #define RISCV_EXCP_INT_FLAG                0x80000000
 #define RISCV_EXCP_INT_MASK                0x7fffffff
+
+#define DFR_EF  1 // dasics ecall fault
+#define DFR_LF  2 // dasics load fault
+#define DFR_SF  3 // dasics store fault
+#define DFR_JF  4 // dasics jump 
 
 /* Interrupt causes */
 #define IRQ_U_SOFT                         0

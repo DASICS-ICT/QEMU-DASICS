@@ -226,14 +226,8 @@ static const char * const riscv_excp_names[] = {
     "guest_load_page_fault",
     "reserved",
     "guest_store_page_fault",
-    "dasics_user_fault_fetch",
-    "dasics_supervisor_fault_fetch",
-    "dasics_user_fault_load",
-    "dasics_supervisor_fault_load",
-    "dasics_user_fault_store",
-    "dasics_supervisor_fault_store",
-    "dasics_user_fault_ecall",
-    "dasics_supervisor_fault_ecall"
+    "dasics_user_check_fault",
+    "dasics_supervisor_check_fault",
 };
 
 static const char * const riscv_intr_names[] = {

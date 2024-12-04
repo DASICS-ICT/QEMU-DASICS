@@ -213,7 +213,7 @@ struct CPUArchState {
     target_ulong uepc;
     target_ulong ucause;
     target_ulong utval;
-
+    target_ulong utimer;
 
     target_ulong stvec;
     target_ulong sepc;

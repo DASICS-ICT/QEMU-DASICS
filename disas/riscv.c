@@ -2032,6 +2032,7 @@ static const char *csr_name(int csrno)
     case 0x0042: return "ucause";
     case 0x0043: return "utval";
     case 0x0044: return "uip";
+    case 0x0045: return "utimer";
     case 0x0100: return "sstatus";
     case 0x0102: return "sedeleg";
     case 0x0103: return "sideleg";
@@ -2273,6 +2274,7 @@ static const char *csr_name(int csrno)
     case 0x08b0: return "dmaincall";
     case 0x08b1: return "dretpc";
     case 0x08b2: return "dretpcactz";
+    case 0x08b3: return "dfreason";
     default: return NULL;
     }
 }

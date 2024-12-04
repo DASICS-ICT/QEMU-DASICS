@@ -1637,12 +1637,8 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         case RISCV_EXCP_LOAD_PAGE_FAULT:
         case RISCV_EXCP_STORE_PAGE_FAULT:
         // DASICS Exception number
-        case RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT:
-        case RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT:
-        case RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT:
-        case RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT:
-        case RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT:
-        case RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT:        
+        case RISCV_EXCP_DASICS_U_CHECK_FAULT:
+        case RISCV_EXCP_DASICS_S_CHECK_FAULT:      
             write_gva = env->two_stage_lookup;
             tval = env->badaddr;
             if (env->two_stage_indirect_lookup) {
@@ -1701,12 +1697,12 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             }
             /* check whether this ecall comes from untrusted zone */
             bool is_trusted = dasics_in_trusted_zone(env, env->pc);
-            bool untrusted_u = env->priv == PRV_U && !is_trusted;
-            bool untrusted_s = env->priv == PRV_S && !is_trusted;
-            cause = (untrusted_s) ? RISCV_EXCP_DASICS_S_ECALL_FAULT :
-                    (untrusted_u) ? RISCV_EXCP_DASICS_U_ECALL_FAULT :
+            bool untrusted_u = env->priv == PRV_U && !is_trusted && !(env->dasics_state.maincfg & MCFG_CUET);
+            bool untrusted_s = env->priv == PRV_S && !is_trusted && !(env->dasics_state.maincfg & MCFG_CSET);
+            cause = (untrusted_s) ? RISCV_EXCP_DASICS_S_CHECK_FAULT :
+                    (untrusted_u) ? RISCV_EXCP_DASICS_U_CHECK_FAULT :
                                     cause;            
-
+            if (untrusted_s || untrusted_u) env->dasics_state.dfreason = DFR_EF;
         }
     }
 

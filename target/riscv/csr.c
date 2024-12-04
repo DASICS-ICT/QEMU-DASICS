@@ -1173,14 +1173,8 @@ static const uint64_t all_ints = M_MODE_INTERRUPTS | S_MODE_INTERRUPTS |
                          (1ULL << (RISCV_EXCP_LOAD_GUEST_ACCESS_FAULT)) | \
                          (1ULL << (RISCV_EXCP_VIRT_INSTRUCTION_FAULT)) | \
                          (1ULL << (RISCV_EXCP_STORE_GUEST_AMO_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_U_ECALL_FAULT)) | \
-                         (1ULL << (RISCV_EXCP_DASICS_S_ECALL_FAULT)))
+                         (1ULL << (RISCV_EXCP_DASICS_U_CHECK_FAULT)) | \
+                         (1ULL << (RISCV_EXCP_DASICS_S_CHECK_FAULT)))
 static const target_ulong vs_delegable_excps = DELEGABLE_EXCPS &
     ~((1ULL << (RISCV_EXCP_S_ECALL)) |
       (1ULL << (RISCV_EXCP_VS_ECALL)) |
@@ -2918,6 +2912,17 @@ static int rmw_uip(CPURISCVState *env, int csrno, target_ulong *ret_value,
     return ret;
 }
 
+static int read_utimer(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->utimer;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_utimer(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->utimer = val;
+    return RISCV_EXCP_NONE;
+}
 
 static int read_vstopi(CPURISCVState *env, int csrno, target_ulong *val)
 {
@@ -4275,6 +4280,18 @@ static RISCVException write_dretpcactz(CPURISCVState *env, int csrno, target_ulo
     return RISCV_EXCP_NONE;
 }
 
+static RISCVException read_dfreason(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->dasics_state.dfreason;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_dfreason(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->dasics_state.dfreason = val;
+    return RISCV_EXCP_NONE;
+}
+
 static RISCVException read_dlcfg(CPURISCVState *env, int csrno, target_ulong *val)
 {
     uint32_t step = 4;  // RV64
@@ -4485,38 +4502,39 @@ static RISCVException read_dsmcfg(CPURISCVState *env, int csrno, target_ulong *v
 
 static RISCVException write_dsmcfg(CPURISCVState *env, int csrno, target_ulong val)
 {
-    // Perform CLS logic of dsmcfg first
-    bool val_scls = (val & MCFG_SCLS) != 0;
-    bool val_ucls = (val & MCFG_UCLS) != 0;
+    // // Perform CLS logic of dsmcfg first
+    // bool val_scls = (val & MCFG_SCLS) != 0;
+    // bool val_ucls = (val & MCFG_UCLS) != 0;
 
-    if (val_scls) {
-        write_dumbound(env, CSR_DUMBOUND0, 0);
-        write_dumbound(env, CSR_DUMBOUND1, 0);
-    }
+    // if (val_scls) {
+    //     write_dumbound(env, CSR_DUMBOUND0, 0);
+    //     write_dumbound(env, CSR_DUMBOUND1, 0);
+    // }
 
-    // Clear all dasics register
-    if (val_scls || val_ucls) {
-        write_dlcfg(env, CSR_DLCFG, 0);
-        for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
-            write_dlbound(env, CSR_DLBOUND0 + (i << 1), 0);
-            write_dlbound(env, CSR_DLBOUND1 + (i << 1), 0);
-        }
+    // // Clear all dasics register
+    // if (val_scls || val_ucls) {
+    //     write_dlcfg(env, CSR_DLCFG, 0);
+    //     for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
+    //         write_dlbound(env, CSR_DLBOUND0 + (i << 1), 0);
+    //         write_dlbound(env, CSR_DLBOUND1 + (i << 1), 0);
+    //     }
 
-        write_dljmpcfg(env, CSR_DJMPCFG, 0);
-        for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
-            write_dlbound(env, CSR_DLIBJMPBOUND0 + (i << 1), 0);
-            write_dlbound(env, CSR_DLIBJMPBOUND1 + (i << 1), 0);
-        }        
+    //     write_dljmpcfg(env, CSR_DJMPCFG, 0);
+    //     for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
+    //         write_dlbound(env, CSR_DLIBJMPBOUND0 + (i << 1), 0);
+    //         write_dlbound(env, CSR_DLIBJMPBOUND1 + (i << 1), 0);
+    //     }        
 
-        write_dmaincall(env, CSR_DMAINCALL, 0);
-        write_dretpc(env, CSR_DRETPC, 0);
-        write_dretpcactz(env, CSR_DRETPCACTZ, 0);
-    }
+    //     write_dmaincall(env, CSR_DMAINCALL, 0);
+    //     write_dretpc(env, CSR_DRETPC, 0);
+    //     write_dretpcactz(env, CSR_DRETPCACTZ, 0);
+    //     write_dfreason(env, CSR_DFREASON, 0);
+    // }
 
     // Then update dsmcfg itself. CLS bit has already taken effect, thus set to 0
     target_ulong mask = (csrno == CSR_DSMCFG) ? SMCFG_MASK : UMCFG_MASK;
     env->dasics_state.maincfg = (env->dasics_state.maincfg & ~mask) |
-                                (val & ~MCFG_SCLS & ~MCFG_UCLS & mask);
+                                (val & mask);
 
     return RISCV_EXCP_NONE;
 }
@@ -4745,7 +4763,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_UCAUSE]    = { "ucause",   uli, read_ucause,        write_ucause       },
     [CSR_UTVAL]     = { "utval",    uli, read_utval,         write_utval        },
     [CSR_UIP]       = { "uip",      uli, NULL,       NULL,    rmw_uip           },
-
+    [CSR_UTIMER]    = { "utimer",   uli, read_utimer,        write_utimer       },
     /* Supervisor-Level Window to Indirectly Accessed Registers (AIA) */
     [CSR_SISELECT]   = { "siselect",   aia_smode, NULL, NULL, rmw_xiselect },
     [CSR_SIREG]      = { "sireg",      aia_smode, NULL, NULL, rmw_xireg },
@@ -5292,5 +5310,6 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_DMAINCALL]      = {"dmaincall",    dasics,     read_dmaincall, write_dmaincall     },
     [CSR_DRETPC]         = {"dretpc",       dasics,     read_dretpc,    write_dretpc        },
     [CSR_DRETPCACTZ]     = {"dretpcactz",   dasics,     read_dretpcactz,  write_dretpcactz  },
+    [CSR_DFREASON]       = {"dfreason",     dasics,     read_dfreason,    write_dfreason    },
 
 };
