@@ -756,6 +756,9 @@ typedef enum RISCVException {
     RISCV_EXCP_DASICS_S_CHECK_FAULT = 0x19,
 } RISCVException;
 
+/* zicfilp defines lp violation results in sw check with tval = 2*/
+#define RISCV_EXCP_SW_CHECK_FCFI_TVAL      2
+
 #define RISCV_EXCP_INT_FLAG                0x80000000
 #define RISCV_EXCP_INT_MASK                0x7fffffff
 
