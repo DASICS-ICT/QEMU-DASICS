@@ -899,6 +899,9 @@ static void riscv_cpu_reset_hold(Object *obj)
     }
     /* mmte is supposed to have pm.current hardwired to 1 */
     env->mmte |= (EXT_STATUS_INITIAL | MMTE_M_PM_CURRENT);
+#else
+    env->menvcfg = 0;
+    env->senvcfg = 0;
 #endif
 
     /* on reset elp is clear */
