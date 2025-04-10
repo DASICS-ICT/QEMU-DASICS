@@ -4077,6 +4077,9 @@ static inline RISCVException riscv_csrrw_check(CPURISCVState *env,
     }
 
     if (effective_priv == PRV_U && !dasics_in_trusted_zone(env, env->pc)) {
+        if ((csrno >= CSR_DUMCFG && csrno <= CSR_DUMBOUND1) ||
+            (csrno >= CSR_DLCFG && csrno <= CSR_DFREASON))
+            return RISCV_EXCP_ILLEGAL_INST;
         return RISCV_EXCP_ILLEGAL_INST;
     }
 #endif
