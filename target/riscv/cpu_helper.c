@@ -1768,6 +1768,10 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             cause < TARGET_LONG_BITS && ((delegS >> cause) & 1)) {
         /* handle the trap in U-mode */
         target_ulong s = env->mstatus;
+        
+        if (cpu_get_fcfien(env)) {
+            s = set_field(s, MSTATUS_UPELP, env->elp);
+        }
         s = set_field(s, MSTATUS_UPIE, get_field(s, MSTATUS_UIE));
         s = set_field(s, MSTATUS_UIE, 0);
         env->mstatus = s;

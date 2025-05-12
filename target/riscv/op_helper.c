@@ -275,6 +275,15 @@ target_ulong helper_uret(CPURISCVState *env)
     riscv_cpu_set_mode(env, PRV_U);
     env->mstatus = mstatus;
 
+    /*
+     * If forward cfi enabled for new priv, restore elp status
+     * and clear upelp in mstatus
+     */
+    if (cpu_get_fcfien(env)) {
+        env->elp = get_field(env->mstatus, MSTATUS_UPELP);
+    }
+    env->mstatus = set_field(env->mstatus, MSTATUS_UPELP, 0);
+
     return retpc;
 }
 
