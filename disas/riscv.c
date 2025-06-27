@@ -2271,8 +2271,17 @@ static const char *csr_name(int csrno)
     case 0x08c7: return "dlibjmpbound7";
     case 0x08c8: return "djmpcfg";
     case 0x08b0: return "dmaincall";
-    case 0x08b1: return "dretpc";
     case 0x08b2: return "dretpcactz";
+    case 0x08b3: return "dretpc0";
+    case 0x08b4: return "dretpc1";
+    case 0x08b5: return "dretpc2";
+    case 0x08b6: return "dretpc3";
+    case 0x08cc: return "dmlevel";
+    case 0x08cd: return "djlevel";
+    case 0x08d0: return "dscratchcfg";
+    case 0x08d2: return "dscratchlo";
+    case 0x08d3: return "dscratchhi";
+    case 0x08d4: return "dscratchlvl";
     default: return NULL;
     }
 }
