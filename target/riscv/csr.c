@@ -4319,11 +4319,13 @@ static RISCVException write_dlcfg(CPURISCVState *env, int csrno, target_ulong va
 
     uint32_t step = 4;  // RV64
     uint8_t cfgval = 0;
+    uint8_t curval;
 
     // Each libcfg contains 8 tiny configs
     for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
         cfgval = (val >> (step * i)) & LIBCFG_MASK;
-        if (trusted || ((cfgval & LIBCFG_V) && curLevel < dasics_get_mem_level_from_idx(env, i))) {
+        curval = env->dasics_state.libcfg[i] & LIBCFG_MASK;
+        if (trusted || ((curval & LIBCFG_V) && (cfgval & (~curval)) == 0 && curLevel < dasics_get_mem_level_from_idx(env, i))) {
             env->dasics_state.libcfg[i] = cfgval;
         }
     }
