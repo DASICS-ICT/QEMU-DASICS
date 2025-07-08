@@ -636,7 +636,8 @@ void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong ne
         dst_activezone = dasics_in_active_zone(env, newpc);
 
     int allow_lib_to_main = !src_trusted && dst_trusted &&
-        (newpc == env->dasics_state.dretpc || newpc == env->dasics_state.dmaincall);
+        (newpc == env->dasics_state.dretpc || newpc == env->dasics_state.dmaincall ||
+         newpc == env->dasics_state.dmaincall2);
     int allow_activezone_to_lib = src_activezone && !dst_trusted &&
         !dst_activezone && (newpc == env->dasics_state.dretpcactz);
 

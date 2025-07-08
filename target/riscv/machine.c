@@ -388,6 +388,7 @@ static const VMStateDescription dasics_state = {
         VMSTATE_UINTTL(dmaincall, dasics_table_t),
         VMSTATE_UINTTL(dretpc, dasics_table_t),
         VMSTATE_UINTTL(dretpcactz, dasics_table_t),
+        VMSTATE_UINTTL(dmaincall2, dasics_table_t), // New maincall entry
         VMSTATE_END_OF_LIST()
     }
 };

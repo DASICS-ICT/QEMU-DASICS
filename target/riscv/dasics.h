@@ -40,6 +40,7 @@ typedef struct {
     target_ulong    dmaincall;
     target_ulong    dretpc;
     target_ulong    dretpcactz;
+    target_ulong    dmaincall2; // Added for the new maincall entry
 } dasics_table_t;
 
 int dasics_in_trusted_zone(CPURISCVState *env, target_ulong pc);

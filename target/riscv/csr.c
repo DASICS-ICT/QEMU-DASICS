@@ -4251,6 +4251,18 @@ static RISCVException write_dmaincall(CPURISCVState *env, int csrno, target_ulon
     return RISCV_EXCP_NONE;
 }
 
+static RISCVException read_dmaincall2(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->dasics_state.dmaincall2;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_dmaincall2(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->dasics_state.dmaincall2 = val;
+    return RISCV_EXCP_NONE;
+}
+
 static RISCVException read_dretpc(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->dasics_state.dretpc;
@@ -4509,6 +4521,7 @@ static RISCVException write_dsmcfg(CPURISCVState *env, int csrno, target_ulong v
         }        
 
         write_dmaincall(env, CSR_DMAINCALL, 0);
+        write_dmaincall2(env, CSR_DMAINCALL2, 0);
         write_dretpc(env, CSR_DRETPC, 0);
         write_dretpcactz(env, CSR_DRETPCACTZ, 0);
     }
@@ -5292,5 +5305,5 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_DMAINCALL]      = {"dmaincall",    dasics,     read_dmaincall, write_dmaincall     },
     [CSR_DRETPC]         = {"dretpc",       dasics,     read_dretpc,    write_dretpc        },
     [CSR_DRETPCACTZ]     = {"dretpcactz",   dasics,     read_dretpcactz,  write_dretpcactz  },
-
+    [CSR_DMAINCALL2]     = {"dmaincall2",   dasics,     read_dmaincall2, write_dmaincall2   },
 };

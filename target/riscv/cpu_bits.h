@@ -426,7 +426,7 @@
 #define CSR_DMAINCALL       0x8b0
 #define CSR_DRETPC          0x8b1
 #define CSR_DRETPCACTZ      0x8b2
-
+#define CSR_DMAINCALL2      0x8b3 // New maincall entry
 
 /* Performance Counters */
 #define CSR_MHPMCOUNTER3    0xb03

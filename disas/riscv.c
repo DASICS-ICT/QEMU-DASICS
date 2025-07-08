@@ -2273,6 +2273,7 @@ static const char *csr_name(int csrno)
     case 0x08b0: return "dmaincall";
     case 0x08b1: return "dretpc";
     case 0x08b2: return "dretpcactz";
+    case 0x08b3: return "dmaincall2";
     default: return NULL;
     }
 }
