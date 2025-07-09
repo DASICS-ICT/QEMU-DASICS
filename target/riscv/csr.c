@@ -4419,11 +4419,13 @@ static RISCVException write_dljmpcfg(CPURISCVState *env, int csrno, target_ulong
 
     uint32_t step = 16;  // RV64
     uint8_t cfgval = 0;
+    uint8_t curval;
 
     // Each libjmpcfg contains 16 tiny configs
     for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
         cfgval = (val >> (step * i)) & LIBJMPCFG_MASK;
-        if (trusted || curLevel < dasics_get_jmp_level_from_idx(env, i)) {
+        curval = env->dasics_state.libjmpcfg[i] & LIBJMPCFG_MASK;
+        if (trusted || ((curval & LIBJMPCFG_V) && curLevel < dasics_get_jmp_level_from_idx(env, i))) {
             env->dasics_state.libjmpcfg[i] = cfgval;
         }
     }
