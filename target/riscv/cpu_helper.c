@@ -1704,7 +1704,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             bool untrusted_u = env->priv == PRV_U && !is_trusted;
             bool untrusted_s = env->priv == PRV_S && !is_trusted;
             cause = (untrusted_s) ? RISCV_EXCP_DASICS_S_ECALL_FAULT :
-                    (untrusted_u) ? RISCV_EXCP_DASICS_U_ECALL_FAULT :
+                    (untrusted_u && !(env->dasics_state.maincfg & MCFG_CUET)) ? RISCV_EXCP_DASICS_U_ECALL_FAULT :
                                     cause;            
 
         }

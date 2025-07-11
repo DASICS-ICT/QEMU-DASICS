@@ -375,7 +375,7 @@ static const VMStateDescription dasics_state = {
     .minimum_version_id = 1,
     .needed = dasics_needed,
     .fields = (VMStateField[]) {
-        VMSTATE_UINT8(maincfg, dasics_table_t),
+        VMSTATE_UINTTL(maincfg, dasics_table_t),
         VMSTATE_STRUCT(smbound, dasics_table_t, 0, dasics_boundary, dasics_bound_t),
         VMSTATE_STRUCT(umbound, dasics_table_t, 0, dasics_boundary, dasics_bound_t),
         VMSTATE_UINT8_ARRAY(libcfg, dasics_table_t, MAX_DASICS_LIBBOUNDS),

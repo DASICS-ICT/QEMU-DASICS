@@ -572,7 +572,7 @@ void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong ad
 
     // Check whether target address is within dlibbounds
     int level = dasics_get_jmp_level(env, pc);
-    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_R, level)) {
+    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_R, level) && !(env->dasics_state.maincfg & MCFG_CULT)) {
         uint32_t exception = (env->priv == PRV_U) ?
                                 RISCV_EXCP_DASICS_U_LOAD_ACCESS_FAULT:
                                 RISCV_EXCP_DASICS_S_LOAD_ACCESS_FAULT;
@@ -591,7 +591,7 @@ void helper_dasics_st_check(CPURISCVState *env, target_ulong pc, target_ulong ad
 
     // Check whether target address is within dlibbounds
     int level = dasics_get_jmp_level(env, pc);
-    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_W, level)) {
+    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_W, level) && !(env->dasics_state.maincfg & MCFG_CUST)) {
         uint32_t exception = (env->priv == PRV_U) ?
                                 RISCV_EXCP_DASICS_U_STORE_ACCESS_FAULT:
                                 RISCV_EXCP_DASICS_S_STORE_ACCESS_FAULT;
@@ -643,7 +643,7 @@ void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong ne
                      dst_activezone || allow_activezone_to_lib ||
                      allow_lib_to_lib;
 
-    if (!allow_brjp) {
+    if (!allow_brjp && !(env->dasics_state.maincfg & MCFG_CUFT)) {
         uint32_t exception = (env->priv == PRV_U) ?
                                 RISCV_EXCP_DASICS_U_INST_ACCESS_FAULT:
                                 RISCV_EXCP_DASICS_S_INST_ACCESS_FAULT;

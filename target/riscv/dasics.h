@@ -1,13 +1,17 @@
 #ifndef RISCV_DASICS_H
 #define RISCV_DASICS_H
 
+#define MCFG_CUFT           (0x1ul << 7)
+#define MCFG_CULT           (0x1ul << 6)
+#define MCFG_CUST           (0x1ul << 5)
+#define MCFG_CUET           (0x1ul << 4)
 #define MCFG_UCLS           0x8ul
 #define MCFG_SCLS           0x4ul
 #define MCFG_UENA           0X2ul
 #define MCFG_SENA           0x1ul
 
-#define SMCFG_MASK          0xf
-#define UMCFG_MASK          0xa
+#define SMCFG_MASK          0xff
+#define UMCFG_MASK          0xfa
 
 #define LIBCFG_MASK         0xbul
 #define LIBCFG_V            0x8ul
@@ -32,7 +36,7 @@ typedef struct {
 } dasics_bound_t;
 
 typedef struct {
-    uint8_t         maincfg;
+    target_ulong    maincfg;
     dasics_bound_t  smbound;
     dasics_bound_t  umbound;
 
