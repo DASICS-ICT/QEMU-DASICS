@@ -462,7 +462,7 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
     }
 
     // /* TODO: Check U-mode interrupts */
-    irqs = pending & env->mideleg & env->hideleg & env->sideleg & -uie;
+    irqs = pending & env->mideleg & env->sideleg & -uie;
     if (irqs) {
         return riscv_cpu_pending_to_irq(env, IRQ_U_EXT, IPRIO_DEFAULT_LOWER,
                                         irqs, env->uiprio);
