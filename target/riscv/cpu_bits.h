@@ -53,7 +53,7 @@
 #define CSR_UCAUSE          0x042
 #define CSR_UTVAL           0x043
 #define CSR_UIP             0x044
-#define CSR_UTIMER			0x045
+#define CSR_UTIMECMP		0x045
 /* User Floating-Point CSRs */
 #define CSR_FFLAGS          0x001
 #define CSR_FRM             0x002

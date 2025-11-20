@@ -36,6 +36,12 @@ static void riscv_stimer_cb(void *opaque)
     riscv_cpu_update_mip(&cpu->env, MIP_STIP, BOOL_TO_MASK(1));
 }
 
+static void riscv_utimer_cb(void *opaque)
+{
+    RISCVCPU *cpu = opaque;
+    riscv_cpu_update_mip(&cpu->env, MIP_UTIP, BOOL_TO_MASK(1));
+}
+
 /*
  * Called when timecmp is written to update the QEMU timer or immediately
  * trigger timer interrupt if mtimecmp <= current timer value.
@@ -57,8 +63,10 @@ void riscv_timer_write_timecmp(CPURISCVState *env, QEMUTimer *timer,
         if (timer_irq == MIP_VSTIP) {
             env->vstime_irq = 1;
             riscv_cpu_update_mip(env, 0, BOOL_TO_MASK(1));
-        } else {
+        } else if (timer_irq == MIP_STIP) {
             riscv_cpu_update_mip(env, MIP_STIP, BOOL_TO_MASK(1));
+        } else {
+            riscv_cpu_update_mip(env, MIP_UTIP, BOOL_TO_MASK(1));
         }
         return;
     }
@@ -138,4 +146,7 @@ void riscv_timer_init(RISCVCPU *cpu)
 
     env->vstimer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &riscv_vstimer_cb, cpu);
     env->vstimecmp = 0;
+    
+    env->utimer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &riscv_utimer_cb, cpu);
+    env->utimecmp = 0;
 }

@@ -213,7 +213,7 @@ struct CPUArchState {
     target_ulong uepc;
     target_ulong ucause;
     target_ulong utval;
-    target_ulong utimer;
+    target_ulong utimecmp;
 
     target_ulong stvec;
     target_ulong sepc;
@@ -379,6 +379,7 @@ struct CPUArchState {
     /* Fields from here on are preserved across CPU reset. */
     QEMUTimer *stimer; /* Internal timer for S-mode interrupt */
     QEMUTimer *vstimer; /* Internal timer for VS-mode interrupt */
+    QEMUTimer *utimer; /* Internal timer for U-mode interrupt */
     bool vstime_irq;
 
     hwaddr kernel_addr;

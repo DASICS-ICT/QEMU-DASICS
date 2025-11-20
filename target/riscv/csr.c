@@ -1136,6 +1136,24 @@ static RISCVException write_stimecmph(CPURISCVState *env, int csrno,
     return RISCV_EXCP_NONE;
 }
 
+static RISCVException read_utimecmp(CPURISCVState *env, int csrno,
+                                    target_ulong *val)
+{
+    *val = env->utimecmp;
+
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_utimecmp(CPURISCVState *env, int csrno,
+                                     target_ulong val)
+{
+    env->utimecmp = val;
+    riscv_timer_write_timecmp(env, env->utimer, env->utimecmp, 0, MIP_UTIP);
+
+    return RISCV_EXCP_NONE;
+}
+
+
 /* Machine constants */
 
 #define M_MODE_INTERRUPTS  ((uint64_t)(MIP_MSIP | MIP_MTIP | MIP_MEIP))
@@ -2912,17 +2930,17 @@ static int rmw_uip(CPURISCVState *env, int csrno, target_ulong *ret_value,
     return ret;
 }
 
-static int read_utimer(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->utimer;
-    return RISCV_EXCP_NONE;
-}
+// static int read_utimer(CPURISCVState *env, int csrno, target_ulong *val)
+// {
+//     *val = env->utimer;
+//     return RISCV_EXCP_NONE;
+// }
 
-static int write_utimer(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->utimer = val;
-    return RISCV_EXCP_NONE;
-}
+// static int write_utimer(CPURISCVState *env, int csrno, target_ulong val)
+// {
+//     env->utimer = val;
+//     return RISCV_EXCP_NONE;
+// }
 
 static int read_vstopi(CPURISCVState *env, int csrno, target_ulong *val)
 {
@@ -4078,7 +4096,11 @@ static inline RISCVException riscv_csrrw_check(CPURISCVState *env,
 
     if (effective_priv == PRV_U && !dasics_in_trusted_zone(env, env->pc)) {
         if ((csrno >= CSR_DUMCFG && csrno <= CSR_DUMBOUND1) ||
-            (csrno >= CSR_DLCFG && csrno <= CSR_DFREASON))
+            (csrno >= CSR_DLCFG && csrno <= CSR_DFREASON)   ||
+            (csrno >= CSR_USCRATCH && csrno <= CSR_UTIMECMP)||
+            (csrno == CSR_USTATUS)||
+            (csrno == CSR_UIE)||
+            (csrno == CSR_UTVEC))
             return RISCV_EXCP_ILLEGAL_INST;
     }
 #endif
@@ -4765,7 +4787,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_UCAUSE]    = { "ucause",   uli, read_ucause,        write_ucause       },
     [CSR_UTVAL]     = { "utval",    uli, read_utval,         write_utval        },
     [CSR_UIP]       = { "uip",      uli, NULL,       NULL,    rmw_uip           },
-    [CSR_UTIMER]    = { "utimer",   uli, read_utimer,        write_utimer       },
+    [CSR_UTIMECMP]  = { "utimecmp", uli, read_utimecmp,      write_utimecmp     },
     /* Supervisor-Level Window to Indirectly Accessed Registers (AIA) */
     [CSR_SISELECT]   = { "siselect",   aia_smode, NULL, NULL, rmw_xiselect },
     [CSR_SIREG]      = { "sireg",      aia_smode, NULL, NULL, rmw_xireg },
