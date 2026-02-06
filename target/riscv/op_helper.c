@@ -24,6 +24,7 @@
 #include "exec/exec-all.h"
 #include "exec/cpu_ldst.h"
 #include "exec/helper-proto.h"
+#include "trace.h"
 
 /* Exceptions processing helpers */
 G_NORETURN void riscv_raise_exception(CPURISCVState *env,
@@ -564,6 +565,9 @@ target_ulong helper_hyp_hlvx_wu(CPURISCVState *env, target_ulong addr)
 /* DASICS helpers */
 void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
 {
+    if (env->priv == PRV_U) {
+        trace_riscv_inst_load(pc, addr);
+    }
     // Load from trusted code zone is permitted
     if (/*!riscv_feature(env, RISCV_FEATURE_DASICS) ||*/
             dasics_in_trusted_zone(env, pc)) {
@@ -585,6 +589,9 @@ void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong ad
 
 void helper_dasics_st_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
 {
+    if (env->priv == PRV_U) {
+        trace_riscv_inst_store(pc, addr);
+    }
     // Store from trusted code zone is permitted
     if (/*!riscv_feature(env, RISCV_FEATURE_DASICS) || */
             dasics_in_trusted_zone(env, pc)) {
@@ -627,7 +634,9 @@ void helper_dasics_call(CPURISCVState *env, target_ulong pc, target_ulong newpc,
 
 void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong newpc, target_ulong nextpc)
 {
-
+    if (env->priv == PRV_U) {
+        trace_riscv_inst_branch(pc, newpc);
+    }
     // Check whether this redirect instr is permitted
     int src_trusted = dasics_in_trusted_zone(env, pc);
     // Trusted area can jump to anywhere and don't care target
