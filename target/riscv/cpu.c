@@ -228,6 +228,8 @@ static const char * const riscv_excp_names[] = {
     "guest_store_page_fault",
     "dasics_user_check_fault",
     "dasics_supervisor_check_fault",
+    "pku_fault_load",
+    "pku_fault_store",
 };
 
 static const char * const riscv_intr_names[] = {
@@ -1772,6 +1774,7 @@ static Property riscv_cpu_extensions[] = {
     DEFINE_PROP_BOOL("mmu", RISCVCPU, cfg.mmu, true),
     DEFINE_PROP_BOOL("pmp", RISCVCPU, cfg.pmp, true),
     DEFINE_PROP_BOOL("dasics", RISCVCPU, cfg.dasics, true),
+    DEFINE_PROP_BOOL("mpk", RISCVCPU, cfg.mpk, true),
     DEFINE_PROP_BOOL("sstc", RISCVCPU, cfg.ext_sstc, true),
 
     DEFINE_PROP_STRING("priv_spec", RISCVCPU, cfg.priv_spec),

@@ -369,6 +369,7 @@ static const VMStateDescription dasics_boundary = {
     }
 };
 
+
 static const VMStateDescription dasics_state = {
     .name = "cpu/dasics",
     .version_id = 1,
@@ -389,6 +390,25 @@ static const VMStateDescription dasics_state = {
         VMSTATE_UINTTL(dretpc, dasics_table_t),
         VMSTATE_UINTTL(dretpcactz, dasics_table_t),
         VMSTATE_UINTTL(dfreason, dasics_table_t),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
+static bool mpk_needed(void *opaque)
+{
+    RISCVCPU *cpu = opaque;
+
+    return cpu->cfg.mpk;
+}
+
+static const VMStateDescription vmstate_mpk = {
+    .name = "cpu/mpk",
+    .version_id = 1,
+    .minimum_version_id = 0,
+    .needed = mpk_needed,
+    .fields = (VMStateField[]) {
+        VMSTATE_UINTTL(env.upkru, RISCVCPU),
+        VMSTATE_UINTTL(env.spkctl, RISCVCPU),
         VMSTATE_END_OF_LIST()
     }
 };
@@ -471,6 +491,7 @@ const VMStateDescription vmstate_riscv_cpu = {
         &vmstate_debug,
         &vmstate_smstateen,
         &vmstate_jvt,
+        &vmstate_mpk,
         NULL
     }
 };

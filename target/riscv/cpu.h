@@ -79,6 +79,7 @@ enum {
     TRANSLATE_SUCCESS,
     TRANSLATE_FAIL,
     TRANSLATE_PMP_FAIL,
+    TRANSLATE_PKEY_FAIL,
     TRANSLATE_G_STAGE_FAIL
 };
 
@@ -172,6 +173,9 @@ struct CPUArchState {
 #endif
 
     dasics_table_t dasics_state;
+    /* memory protection keys */
+    target_ulong upkru;
+    target_ulong spkctl;
 
     
 #ifndef CONFIG_USER_ONLY
