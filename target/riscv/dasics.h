@@ -35,6 +35,10 @@
 #define MAX_DASICS_LIBBOUNDS 16
 #define MAX_DASICS_LIBJMPBOUNDS 4
 
+#define S0_PHASE_INIT_LOCKED      0
+#define S0_PHASE_ACTIVE           1
+#define S0_PHASE_RESTORED_LOCKED  2
+
 typedef struct {
     target_ulong hi;
     target_ulong lo;
@@ -55,6 +59,13 @@ typedef struct {
     target_ulong    dretpc;
     target_ulong    dretpcactz;
     target_ulong    dfreason;
+
+    /* s0 guard (phase-1 minimal POC) */
+    uint8_t         sreg_guard_enable;
+    uint8_t         s0_phase;
+    uint8_t         s0_saved_once;
+    target_ulong    s0_sp_off;         /* record only offset to sp */
+    target_ulong    s0_shadow_cipher;
 } dasics_table_t;
 
 int dasics_in_trusted_zone(CPURISCVState *env, target_ulong pc);

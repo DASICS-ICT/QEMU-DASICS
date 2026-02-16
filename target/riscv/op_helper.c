@@ -561,6 +561,100 @@ target_ulong helper_hyp_hlvx_wu(CPURISCVState *env, target_ulong addr)
     return cpu_ldl_code_mmu(env, addr, oi, ra);
 }
 
+static void dasics_raise_s0_fault(CPURISCVState *env, target_ulong bad,
+                                  target_ulong reason)
+{
+    uint32_t exception = (env->priv == PRV_U) ?
+                         RISCV_EXCP_DASICS_U_CHECK_FAULT :
+                         RISCV_EXCP_DASICS_S_CHECK_FAULT;
+
+    env->badaddr = bad;
+    env->dasics_state.dfreason = reason;
+    riscv_raise_exception(env, exception, GETPC());
+}
+
+static inline target_ulong s0_guard_codec(target_ulong value, target_ulong addr)
+{
+    const target_ulong k = (target_ulong)0x9e3779b97f4a7c15ULL;
+
+    return value ^ k ^ addr;
+}
+
+void helper_dasics_s0_access_check(CPURISCVState *env, target_ulong pc, uint32_t regno)
+{
+    if (regno != 8 || !env->dasics_state.sreg_guard_enable) {
+        return;
+    }
+    if (dasics_in_trusted_zone(env, pc)) {
+        return;
+    }
+    if (env->dasics_state.s0_phase != S0_PHASE_ACTIVE) {
+        dasics_raise_s0_fault(env, pc, DFR_S0_VIOL);
+    }
+}
+
+target_ulong helper_dasics_s0_store_gate(CPURISCVState *env, target_ulong pc,
+                                         uint32_t regno, uint32_t rs1,
+                                         target_ulong addr, target_ulong plain)
+{
+    target_long off;
+    target_ulong cipher;
+
+    if (regno != 8 || !env->dasics_state.sreg_guard_enable) {
+        return plain;
+    }
+    if (dasics_in_trusted_zone(env, pc)) {
+        return plain;
+    }
+    if (env->dasics_state.s0_phase != S0_PHASE_INIT_LOCKED) {
+        dasics_raise_s0_fault(env, addr, DFR_S0_PROTO);
+    }
+    if (rs1 != 2) {
+        dasics_raise_s0_fault(env, addr, DFR_S0_PROTO);
+    }
+
+    off = (target_long)addr - (target_long)env->gpr[2];
+    if (off < 0 || (off & 0x7)) {
+        dasics_raise_s0_fault(env, addr, DFR_S0_PROTO);
+    }
+
+    cipher = s0_guard_codec(plain, addr);
+    env->dasics_state.s0_sp_off = (target_ulong)off;
+    env->dasics_state.s0_shadow_cipher = cipher;
+    env->dasics_state.s0_saved_once = 1;
+    env->dasics_state.s0_phase = S0_PHASE_ACTIVE;
+    return cipher;
+}
+
+target_ulong helper_dasics_s0_load_gate(CPURISCVState *env, target_ulong pc,
+                                        uint32_t regno, uint32_t rs1,
+                                        target_ulong addr, target_ulong cipher_in)
+{
+    target_long off;
+    target_ulong plain;
+
+    if (regno != 8 || !env->dasics_state.sreg_guard_enable) {
+        return cipher_in;
+    }
+    if (dasics_in_trusted_zone(env, pc)) {
+        return cipher_in;
+    }
+    if (env->dasics_state.s0_phase != S0_PHASE_ACTIVE || rs1 != 2) {
+        dasics_raise_s0_fault(env, addr, DFR_S0_PROTO);
+    }
+
+    off = (target_long)addr - (target_long)env->gpr[2];
+    if ((target_ulong)off != env->dasics_state.s0_sp_off ||
+        cipher_in != env->dasics_state.s0_shadow_cipher) {
+        dasics_raise_s0_fault(env, addr, DFR_S0_PROTO);
+    }
+
+    plain = s0_guard_codec(cipher_in, addr);
+    env->dasics_state.s0_saved_once = 0;
+    env->dasics_state.s0_phase = S0_PHASE_RESTORED_LOCKED;
+    return plain;
+}
+
 /* DASICS helpers */
 void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
 {
@@ -623,6 +717,14 @@ void helper_dasics_call(CPURISCVState *env, target_ulong pc, target_ulong newpc,
     // Save nextpc
     env->dasics_state.dretpc = nextpc;
 
+    if (src_trusted && !dasics_in_trusted_zone(env, newpc)) {
+        env->dasics_state.sreg_guard_enable = 1;
+        env->dasics_state.s0_phase = S0_PHASE_INIT_LOCKED;
+        env->dasics_state.s0_saved_once = 0;
+        env->dasics_state.s0_sp_off = 0;
+        env->dasics_state.s0_shadow_cipher = 0;
+    }
+
 }
 
 void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong newpc, target_ulong nextpc)
@@ -669,6 +771,13 @@ void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong ne
          !src_activezone && \
          dst_activezone) {
         env->dasics_state.dretpcactz = nextpc;
+    }
+
+    if (env->dasics_state.sreg_guard_enable && !src_trusted && dst_trusted) {
+        env->dasics_state.s0_phase = S0_PHASE_INIT_LOCKED;
+        env->dasics_state.s0_saved_once = 0;
+        env->dasics_state.s0_sp_off = 0;
+        env->dasics_state.s0_shadow_cipher = 0;
     }
 
 }

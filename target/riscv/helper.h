@@ -140,6 +140,9 @@ DEF_HELPER_3(dasics_ld_check, void, env, tl, tl)
 DEF_HELPER_3(dasics_st_check, void, env, tl, tl)
 DEF_HELPER_4(dasics_call, void, env, tl, tl, tl)
 DEF_HELPER_4(dasics_redirect, void, env, tl, tl, tl)
+DEF_HELPER_3(dasics_s0_access_check, void, env, tl, i32)
+DEF_HELPER_6(dasics_s0_store_gate, tl, env, tl, i32, i32, tl, tl)
+DEF_HELPER_6(dasics_s0_load_gate, tl, env, tl, i32, i32, tl, tl)
 /* Native Debug */
 DEF_HELPER_1(itrigger_match, void, env)
 #endif

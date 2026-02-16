@@ -262,6 +262,16 @@ static bool gen_load_tl(DisasContext *ctx, arg_lb *a, MemOp memop)
 #endif
 
     tcg_gen_qemu_ld_tl(dest, addr, ctx->mem_idx, memop);
+#ifndef CONFIG_USER_ONLY
+    {
+        TCGv plain = tcg_temp_new();
+        TCGv_i32 rdno = tcg_constant_i32(a->rd);
+        TCGv_i32 baseno = tcg_constant_i32(a->rs1);
+
+        gen_helper_dasics_s0_load_gate(plain, cpu_env, pc_now, rdno, baseno, addr, dest);
+        tcg_gen_mov_tl(dest, plain);
+    }
+#endif
     gen_set_gpr(ctx, a->rd, dest);
     return true;
 }
@@ -363,6 +373,15 @@ static bool gen_store_tl(DisasContext *ctx, arg_sb *a, MemOp memop)
     gen_pc_plus_diff(pc_now, ctx, 0);
     
     gen_helper_dasics_st_check(cpu_env, pc_now, addr);
+
+    {
+        TCGv gated = tcg_temp_new();
+        TCGv_i32 regno = tcg_constant_i32(a->rs2);
+        TCGv_i32 baseno = tcg_constant_i32(a->rs1);
+
+        gen_helper_dasics_s0_store_gate(gated, cpu_env, pc_now, regno, baseno, addr, data);
+        tcg_gen_mov_tl(data, gated);
+    }
 #endif
 
     tcg_gen_qemu_st_tl(data, addr, ctx->mem_idx, memop);
