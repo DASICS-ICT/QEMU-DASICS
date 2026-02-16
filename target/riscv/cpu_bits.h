@@ -758,8 +758,8 @@ typedef enum RISCVException {
 #define DFR_LF  2 // dasics load fault
 #define DFR_SF  3 // dasics store fault
 #define DFR_JF  4 // dasics jump 
-#define DFR_S0_VIOL  5 // illegal read/write/use of s0 in untrusted zone
-#define DFR_S0_PROTO 6 // illegal s0 save/restore protocol
+#define DFR_S0_VIOL  7 // illegal read/write/use of s0 in untrusted zone
+#define DFR_S0_PROTO 8 // illegal s0 save/restore protocol
 
 /* Interrupt causes */
 #define IRQ_U_SOFT                         0

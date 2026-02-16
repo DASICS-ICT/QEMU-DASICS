@@ -567,6 +567,18 @@ static void dasics_raise_s0_fault(CPURISCVState *env, target_ulong bad,
     uint32_t exception = (env->priv == PRV_U) ?
                          RISCV_EXCP_DASICS_U_CHECK_FAULT :
                          RISCV_EXCP_DASICS_S_CHECK_FAULT;
+    const char *reason_name = "DFR_S0_UNKNOWN";
+
+    if (reason == DFR_S0_VIOL) {
+        reason_name = "DFR_S0_VIOL";
+    } else if (reason == DFR_S0_PROTO) {
+        reason_name = "DFR_S0_PROTO";
+    }
+
+    fprintf(stderr,
+            "[DASICS_S0_FAULT] reason=%s(%lu) bad=0x" TARGET_FMT_lx
+            " pc=0x" TARGET_FMT_lx "\n",
+            reason_name, (unsigned long)reason, bad, (target_ulong)GETPC());
 
     env->badaddr = bad;
     env->dasics_state.dfreason = reason;
@@ -701,6 +713,7 @@ void helper_dasics_st_check(CPURISCVState *env, target_ulong pc, target_ulong ad
 void helper_dasics_call(CPURISCVState *env, target_ulong pc, target_ulong newpc, target_ulong nextpc)
 {
     int src_trusted = dasics_in_trusted_zone(env, pc);
+    int dst_trusted = dasics_in_trusted_zone(env, newpc);
 
     // Only trusted area can call dasicscall
     if (!src_trusted && 
@@ -717,7 +730,7 @@ void helper_dasics_call(CPURISCVState *env, target_ulong pc, target_ulong newpc,
     // Save nextpc
     env->dasics_state.dretpc = nextpc;
 
-    if (src_trusted && !dasics_in_trusted_zone(env, newpc)) {
+    if (src_trusted && !dst_trusted) {
         env->dasics_state.sreg_guard_enable = 1;
         env->dasics_state.s0_phase = S0_PHASE_INIT_LOCKED;
         env->dasics_state.s0_saved_once = 0;
