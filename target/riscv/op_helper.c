@@ -567,18 +567,6 @@ static void dasics_raise_s0_fault(CPURISCVState *env, target_ulong bad,
     uint32_t exception = (env->priv == PRV_U) ?
                          RISCV_EXCP_DASICS_U_CHECK_FAULT :
                          RISCV_EXCP_DASICS_S_CHECK_FAULT;
-    const char *reason_name = "DFR_S0_UNKNOWN";
-
-    if (reason == DFR_S0_VIOL) {
-        reason_name = "DFR_S0_VIOL";
-    } else if (reason == DFR_S0_PROTO) {
-        reason_name = "DFR_S0_PROTO";
-    }
-
-    fprintf(stderr,
-            "[DASICS_S0_FAULT] reason=%s(%lu) bad=0x" TARGET_FMT_lx
-            " pc=0x" TARGET_FMT_lx "\n",
-            reason_name, (unsigned long)reason, bad, (target_ulong)GETPC());
 
     env->badaddr = bad;
     env->dasics_state.dfreason = reason;
