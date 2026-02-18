@@ -268,7 +268,7 @@ static bool gen_load_tl(DisasContext *ctx, arg_lb *a, MemOp memop)
         TCGv_i32 rdno = tcg_constant_i32(a->rd);
         TCGv_i32 baseno = tcg_constant_i32(a->rs1);
 
-        gen_helper_dasics_s0_load_gate(plain, cpu_env, pc_now, rdno, baseno, addr, dest);
+        gen_helper_dasics_sreg_load_gate(plain, cpu_env, pc_now, rdno, baseno, addr, dest);
         tcg_gen_mov_tl(dest, plain);
     }
 #endif
@@ -379,7 +379,7 @@ static bool gen_store_tl(DisasContext *ctx, arg_sb *a, MemOp memop)
         TCGv_i32 regno = tcg_constant_i32(a->rs2);
         TCGv_i32 baseno = tcg_constant_i32(a->rs1);
 
-        gen_helper_dasics_s0_store_gate(gated, cpu_env, pc_now, regno, baseno, addr, data);
+        gen_helper_dasics_sreg_store_gate(gated, cpu_env, pc_now, regno, baseno, addr, data);
         tcg_gen_mov_tl(data, gated);
     }
 #endif

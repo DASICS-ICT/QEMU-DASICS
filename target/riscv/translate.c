@@ -327,16 +327,16 @@ static TCGv get_gpr(DisasContext *ctx, int reg_num, DisasExtend ext)
     }
 
 #ifndef CONFIG_USER_ONLY
-    if (reg_num == 8) {
+    if (reg_num == 8 || reg_num == 9 || (reg_num >= 18 && reg_num <= 27)) {
         bool is_sd_source = ctx->cur_insn_len == 4 &&
                             extract32(ctx->opcode, 0, 7) == 0x23 &&
                             extract32(ctx->opcode, 12, 3) == 0x3 &&
-                            extract32(ctx->opcode, 20, 5) == 8;
+                            extract32(ctx->opcode, 20, 5) == reg_num;
         if (!is_sd_source) {
             TCGv pc_now = tcg_temp_new();
             TCGv_i32 regno = tcg_constant_i32(reg_num);
             gen_pc_plus_diff(pc_now, ctx, 0);
-            gen_helper_dasics_s0_access_check(cpu_env, pc_now, regno);
+            gen_helper_dasics_sreg_access_check(cpu_env, pc_now, regno);
         }
     }
 #endif
@@ -396,16 +396,16 @@ static void gen_set_gpr(DisasContext *ctx, int reg_num, TCGv t)
 {
     if (reg_num != 0) {
 #ifndef CONFIG_USER_ONLY
-        if (reg_num == 8) {
+        if (reg_num == 8 || reg_num == 9 || (reg_num >= 18 && reg_num <= 27)) {
             bool is_ld_dest = ctx->cur_insn_len == 4 &&
                               extract32(ctx->opcode, 0, 7) == 0x03 &&
                               extract32(ctx->opcode, 12, 3) == 0x3 &&
-                              extract32(ctx->opcode, 7, 5) == 8;
+                              extract32(ctx->opcode, 7, 5) == reg_num;
             if (!is_ld_dest) {
                 TCGv pc_now = tcg_temp_new();
                 TCGv_i32 regno = tcg_constant_i32(reg_num);
                 gen_pc_plus_diff(pc_now, ctx, 0);
-                gen_helper_dasics_s0_access_check(cpu_env, pc_now, regno);
+                gen_helper_dasics_sreg_access_check(cpu_env, pc_now, regno);
             }
         }
 #endif
