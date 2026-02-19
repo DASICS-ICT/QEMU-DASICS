@@ -371,7 +371,7 @@ static const VMStateDescription dasics_boundary = {
 
 static const VMStateDescription dasics_state = {
     .name = "cpu/dasics",
-    .version_id = 1,
+    .version_id = 2,
     .minimum_version_id = 1,
     .needed = dasics_needed,
     .fields = (VMStateField[]) {
@@ -389,6 +389,16 @@ static const VMStateDescription dasics_state = {
         VMSTATE_UINTTL(dretpc, dasics_table_t),
         VMSTATE_UINTTL(dretpcactz, dasics_table_t),
         VMSTATE_UINTTL(dfreason, dasics_table_t),
+
+        VMSTATE_UINT8_V(sreg.guard_enable, dasics_table_t, 2),
+        VMSTATE_UINT8_ARRAY_V(sreg.phase, dasics_table_t, DASICS_SREG_COUNT, 2),
+        VMSTATE_UINT8_ARRAY_V(sreg.saved_once, dasics_table_t, DASICS_SREG_COUNT, 2),
+        VMSTATE_UINTTL_ARRAY_V(sreg.sp_off, dasics_table_t, DASICS_SREG_COUNT, 2),
+        VMSTATE_UINTTL_ARRAY_V(sreg.shadow_cipher, dasics_table_t, DASICS_SREG_COUNT, 2),
+        VMSTATE_UINT8_V(sreg.crypto_algo, dasics_table_t, 2),
+        VMSTATE_UINT8_V(sreg.tag_bits, dasics_table_t, 2),
+        VMSTATE_UINTTL_ARRAY_V(sreg.shadow_tag_lo, dasics_table_t, DASICS_SREG_COUNT, 2),
+        VMSTATE_UINTTL_ARRAY_V(sreg.shadow_tag_hi, dasics_table_t, DASICS_SREG_COUNT, 2),
         VMSTATE_END_OF_LIST()
     }
 };

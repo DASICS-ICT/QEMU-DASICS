@@ -46,6 +46,19 @@ typedef struct {
 } dasics_bound_t;
 
 typedef struct {
+    uint8_t         guard_enable;
+    uint8_t         phase[DASICS_SREG_COUNT];
+    uint8_t         saved_once[DASICS_SREG_COUNT];
+    target_ulong    sp_off[DASICS_SREG_COUNT]; /* record only offset to sp */
+    target_ulong    shadow_cipher[DASICS_SREG_COUNT];
+    /* crypto framework v1 draft state (algorithm-swappable path) */
+    uint8_t         crypto_algo; /* v1 default: A (PRF+MAC) */
+    uint8_t         tag_bits;    /* 64 or 128 */
+    target_ulong    shadow_tag_lo[DASICS_SREG_COUNT];
+    target_ulong    shadow_tag_hi[DASICS_SREG_COUNT];
+} dasics_sreg_guard_state_t;
+
+typedef struct {
     uint8_t         maincfg;
     dasics_bound_t  smbound;
     dasics_bound_t  umbound;
@@ -62,11 +75,7 @@ typedef struct {
     target_ulong    dfreason;
 
     /* s-register guard (s0-s11, phase-1 minimal POC) */
-    uint8_t         sreg_guard_enable;
-    uint8_t         sreg_phase[DASICS_SREG_COUNT];
-    uint8_t         sreg_saved_once[DASICS_SREG_COUNT];
-    target_ulong    sreg_sp_off[DASICS_SREG_COUNT]; /* record only offset to sp */
-    target_ulong    sreg_shadow_cipher[DASICS_SREG_COUNT];
+    dasics_sreg_guard_state_t sreg;
 } dasics_table_t;
 
 int dasics_in_trusted_zone(CPURISCVState *env, target_ulong pc);

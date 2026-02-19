@@ -24,6 +24,7 @@
 #include "exec/exec-all.h"
 #include "exec/cpu_ldst.h"
 #include "exec/helper-proto.h"
+#include "dasics_crypto.h"
 
 /* Exceptions processing helpers */
 G_NORETURN void riscv_raise_exception(CPURISCVState *env,
@@ -597,11 +598,17 @@ static void dasics_sreg_guard_reset(dasics_table_t *state)
 {
     int i;
 
+    /* v1 defaults: algorithm A(PRF+MAC), 64-bit tag */
+    state->sreg.crypto_algo = 0;
+    state->sreg.tag_bits = 64;
+
     for (i = 0; i < DASICS_SREG_COUNT; ++i) {
-        state->sreg_phase[i] = SREG_PHASE_INIT_LOCKED;
-        state->sreg_saved_once[i] = 0;
-        state->sreg_sp_off[i] = 0;
-        state->sreg_shadow_cipher[i] = 0;
+        state->sreg.phase[i] = SREG_PHASE_INIT_LOCKED;
+        state->sreg.saved_once[i] = 0;
+        state->sreg.sp_off[i] = 0;
+        state->sreg.shadow_cipher[i] = 0;
+        state->sreg.shadow_tag_lo[i] = 0;
+        state->sreg.shadow_tag_hi[i] = 0;
     }
 }
 
@@ -617,26 +624,18 @@ static void dasics_raise_sreg_fault(CPURISCVState *env, target_ulong bad,
     riscv_raise_exception(env, exception, GETPC());
 }
 
-static inline target_ulong sreg_guard_codec(target_ulong value, target_ulong addr,
-                                            uint32_t regno)
-{
-    const target_ulong k = (target_ulong)0x9e3779b97f4a7c15ULL;
-
-    return value ^ k ^ addr ^ ((target_ulong)regno << 8);
-}
-
 void helper_dasics_sreg_access_check(CPURISCVState *env, target_ulong pc,
                                      uint32_t regno)
 {
     int slot = dasics_sreg_slot(regno);
 
-    if (slot < 0 || !env->dasics_state.sreg_guard_enable) {
+    if (slot < 0 || !env->dasics_state.sreg.guard_enable) {
         return;
     }
     if (dasics_in_trusted_zone(env, pc)) {
         return;
     }
-    if (env->dasics_state.sreg_phase[slot] != SREG_PHASE_ACTIVE) {
+    if (env->dasics_state.sreg.phase[slot] != SREG_PHASE_ACTIVE) {
         dasics_raise_sreg_fault(env, pc, DFR_S0_VIOL);
     }
 }
@@ -647,15 +646,16 @@ target_ulong helper_dasics_sreg_store_gate(CPURISCVState *env, target_ulong pc,
 {
     int slot = dasics_sreg_slot(regno);
     target_long off;
-    target_ulong cipher;
+    target_ulong cipher, tag_lo, tag_hi;
+    uint8_t tag_bits;
 
-    if (slot < 0 || !env->dasics_state.sreg_guard_enable) {
+    if (slot < 0 || !env->dasics_state.sreg.guard_enable) {
         return plain;
     }
     if (dasics_in_trusted_zone(env, pc)) {
         return plain;
     }
-    if (env->dasics_state.sreg_phase[slot] != SREG_PHASE_INIT_LOCKED) {
+    if (env->dasics_state.sreg.phase[slot] != SREG_PHASE_INIT_LOCKED) {
         dasics_raise_sreg_fault(env, addr, DFR_S0_PROTO);
     }
     if (rs1 != 2) {
@@ -667,11 +667,20 @@ target_ulong helper_dasics_sreg_store_gate(CPURISCVState *env, target_ulong pc,
         dasics_raise_sreg_fault(env, addr, DFR_S0_PROTO);
     }
 
-    cipher = sreg_guard_codec(plain, addr, regno);
-    env->dasics_state.sreg_sp_off[slot] = (target_ulong)off;
-    env->dasics_state.sreg_shadow_cipher[slot] = cipher;
-    env->dasics_state.sreg_saved_once[slot] = 1;
-    env->dasics_state.sreg_phase[slot] = SREG_PHASE_ACTIVE;
+    tag_bits = env->dasics_state.sreg.tag_bits;
+    if (tag_bits != 64 && tag_bits != 128) {
+        dasics_raise_sreg_fault(env, addr, DFR_S0_PROTO);
+    }
+
+    dasics_sreg_crypto_seal_a(plain, addr, regno, (target_ulong)off,
+                              tag_bits, &cipher, &tag_lo, &tag_hi);
+
+    env->dasics_state.sreg.sp_off[slot] = (target_ulong)off;
+    env->dasics_state.sreg.shadow_cipher[slot] = cipher;
+    env->dasics_state.sreg.shadow_tag_lo[slot] = tag_lo;
+    env->dasics_state.sreg.shadow_tag_hi[slot] = tag_hi;
+    env->dasics_state.sreg.saved_once[slot] = 1;
+    env->dasics_state.sreg.phase[slot] = SREG_PHASE_ACTIVE;
     return cipher;
 }
 
@@ -682,26 +691,40 @@ target_ulong helper_dasics_sreg_load_gate(CPURISCVState *env, target_ulong pc,
     int slot = dasics_sreg_slot(regno);
     target_long off;
     target_ulong plain;
+    int ret;
+    uint8_t tag_bits;
 
-    if (slot < 0 || !env->dasics_state.sreg_guard_enable) {
+    if (slot < 0 || !env->dasics_state.sreg.guard_enable) {
         return cipher_in;
     }
     if (dasics_in_trusted_zone(env, pc)) {
         return cipher_in;
     }
-    if (env->dasics_state.sreg_phase[slot] != SREG_PHASE_ACTIVE || rs1 != 2) {
+    if (env->dasics_state.sreg.phase[slot] != SREG_PHASE_ACTIVE || rs1 != 2) {
         dasics_raise_sreg_fault(env, addr, DFR_S0_PROTO);
     }
 
     off = (target_long)addr - (target_long)env->gpr[2];
-    if ((target_ulong)off != env->dasics_state.sreg_sp_off[slot] ||
-        cipher_in != env->dasics_state.sreg_shadow_cipher[slot]) {
+    if ((target_ulong)off != env->dasics_state.sreg.sp_off[slot]) {
         dasics_raise_sreg_fault(env, addr, DFR_S0_PROTO);
     }
 
-    plain = sreg_guard_codec(cipher_in, addr, regno);
-    env->dasics_state.sreg_saved_once[slot] = 0;
-    env->dasics_state.sreg_phase[slot] = SREG_PHASE_RESTORED_LOCKED;
+    tag_bits = env->dasics_state.sreg.tag_bits;
+    ret = dasics_sreg_crypto_open_a(cipher_in, addr, regno, (target_ulong)off,
+                                    tag_bits,
+                                    env->dasics_state.sreg.shadow_tag_lo[slot],
+                                    env->dasics_state.sreg.shadow_tag_hi[slot],
+                                    &plain);
+    if (ret != 0) {
+        if (ret == DASICS_SREG_CRYPTO_ERR_AUTH) {
+            dasics_raise_sreg_fault(env, addr, DFR_S0_AUTH);
+        } else {
+            dasics_raise_sreg_fault(env, addr, DFR_S0_PROTO);
+        }
+    }
+
+    env->dasics_state.sreg.saved_once[slot] = 0;
+    env->dasics_state.sreg.phase[slot] = SREG_PHASE_RESTORED_LOCKED;
     return plain;
 }
 
@@ -769,7 +792,7 @@ void helper_dasics_call(CPURISCVState *env, target_ulong pc, target_ulong newpc,
     env->dasics_state.dretpc = nextpc;
 
     if (src_trusted && !dst_trusted) {
-        env->dasics_state.sreg_guard_enable = 1;
+        env->dasics_state.sreg.guard_enable = 1;
         dasics_sreg_guard_reset(&env->dasics_state);
     }
 
@@ -821,7 +844,7 @@ void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong ne
         env->dasics_state.dretpcactz = nextpc;
     }
 
-    if (env->dasics_state.sreg_guard_enable && !src_trusted && dst_trusted) {
+    if (env->dasics_state.sreg.guard_enable && !src_trusted && dst_trusted) {
         dasics_sreg_guard_reset(&env->dasics_state);
     }
 

@@ -20,6 +20,7 @@ riscv_ss.add(files(
   'translate.c',
   'm128_helper.c',
   'crypto_helper.c',
+  'dasics_crypto.c',
   'zce_helper.c',
   'dasics.c'
 ))
