@@ -357,6 +357,56 @@ static bool dasics_needed(void *opaque)
     return cpu->cfg.dasics;
 }
 
+static int dasics_maincfg_get_uint16_from_uint8(QEMUFile *f, void *pv,
+                                                size_t size,
+                                                const VMStateField *field)
+{
+    uint16_t *v = pv;
+
+    (void)size;
+    (void)field;
+    *v = qemu_get_byte(f);
+    return 0;
+}
+
+static int dasics_maincfg_put_uint16_as_uint8(QEMUFile *f, void *pv,
+                                              size_t size,
+                                              const VMStateField *field,
+                                              JSONWriter *vmdesc)
+{
+    uint16_t *v = pv;
+
+    (void)size;
+    (void)field;
+    (void)vmdesc;
+    qemu_put_byte(f, *v & 0xff);
+    return 0;
+}
+
+static const VMStateInfo vmstate_dasics_maincfg_uint16_from_uint8 = {
+    .name = "uint16_from_uint8",
+    .get = dasics_maincfg_get_uint16_from_uint8,
+    .put = dasics_maincfg_put_uint16_as_uint8,
+};
+
+static bool dasics_maincfg_before_v3(void *opaque, int version_id)
+{
+    (void)opaque;
+    return version_id < 3;
+}
+
+static bool dasics_maincfg_v3_or_later(void *opaque, int version_id)
+{
+    (void)opaque;
+    return version_id >= 3;
+}
+
+static bool dasics_guard_enable_v2_v3(void *opaque, int version_id)
+{
+    (void)opaque;
+    return version_id >= 2 && version_id < 4;
+}
+
 static const VMStateDescription dasics_boundary = {
     .name = "cpu/dasics_boundary",
     .version_id = 1,
@@ -371,11 +421,14 @@ static const VMStateDescription dasics_boundary = {
 
 static const VMStateDescription dasics_state = {
     .name = "cpu/dasics",
-    .version_id = 2,
+    .version_id = 4,
     .minimum_version_id = 1,
     .needed = dasics_needed,
     .fields = (VMStateField[]) {
-        VMSTATE_UINT8(maincfg, dasics_table_t),
+        VMSTATE_SINGLE_TEST(maincfg, dasics_table_t, dasics_maincfg_before_v3,
+                            0, vmstate_dasics_maincfg_uint16_from_uint8,
+                            uint16_t),
+        VMSTATE_UINT16_TEST(maincfg, dasics_table_t, dasics_maincfg_v3_or_later),
         VMSTATE_STRUCT(smbound, dasics_table_t, 0, dasics_boundary, dasics_bound_t),
         VMSTATE_STRUCT(umbound, dasics_table_t, 0, dasics_boundary, dasics_bound_t),
         VMSTATE_UINT8_ARRAY(libcfg, dasics_table_t, MAX_DASICS_LIBBOUNDS),
@@ -390,7 +443,7 @@ static const VMStateDescription dasics_state = {
         VMSTATE_UINTTL(dretpcactz, dasics_table_t),
         VMSTATE_UINTTL(dfreason, dasics_table_t),
 
-        VMSTATE_UINT8_V(sreg.guard_enable, dasics_table_t, 2),
+        VMSTATE_UNUSED_TEST(dasics_guard_enable_v2_v3, 1),
         VMSTATE_UINT8_ARRAY_V(sreg.phase, dasics_table_t, DASICS_SREG_COUNT, 2),
         VMSTATE_UINT8_ARRAY_V(sreg.saved_once, dasics_table_t, DASICS_SREG_COUNT, 2),
         VMSTATE_UINTTL_ARRAY_V(sreg.sp_off, dasics_table_t, DASICS_SREG_COUNT, 2),

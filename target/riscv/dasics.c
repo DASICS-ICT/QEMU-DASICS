@@ -77,3 +77,18 @@ int dasics_match_dlib(CPURISCVState *env, target_ulong addr, target_ulong cfg) {
 #endif
     return 0;
 }
+
+bool dasics_sreg_guard_enabled(CPURISCVState *env)
+{
+#ifndef CONFIG_USER_ONLY
+    target_ulong maincfg = env->dasics_state.maincfg;
+
+    if (env->priv == PRV_U) {
+        return (maincfg & MCFG_UENA) && !(maincfg & MCFG_CUSRG);
+    }
+    if (env->priv == PRV_S) {
+        return (maincfg & MCFG_SENA) && !(maincfg & MCFG_CSSRG);
+    }
+#endif
+    return false;
+}

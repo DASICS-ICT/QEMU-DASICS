@@ -629,7 +629,7 @@ void helper_dasics_sreg_access_check(CPURISCVState *env, target_ulong pc,
 {
     int slot = dasics_sreg_slot(regno);
 
-    if (slot < 0 || !env->dasics_state.sreg.guard_enable) {
+    if (slot < 0 || !dasics_sreg_guard_enabled(env)) {
         return;
     }
     if (dasics_in_trusted_zone(env, pc)) {
@@ -649,7 +649,7 @@ target_ulong helper_dasics_sreg_store_gate(CPURISCVState *env, target_ulong pc,
     target_ulong cipher, tag_lo, tag_hi;
     uint8_t tag_bits;
 
-    if (slot < 0 || !env->dasics_state.sreg.guard_enable) {
+    if (slot < 0 || !dasics_sreg_guard_enabled(env)) {
         return plain;
     }
     if (dasics_in_trusted_zone(env, pc)) {
@@ -694,7 +694,7 @@ target_ulong helper_dasics_sreg_load_gate(CPURISCVState *env, target_ulong pc,
     int ret;
     uint8_t tag_bits;
 
-    if (slot < 0 || !env->dasics_state.sreg.guard_enable) {
+    if (slot < 0 || !dasics_sreg_guard_enabled(env)) {
         return cipher_in;
     }
     if (dasics_in_trusted_zone(env, pc)) {
@@ -792,7 +792,6 @@ void helper_dasics_call(CPURISCVState *env, target_ulong pc, target_ulong newpc,
     env->dasics_state.dretpc = nextpc;
 
     if (src_trusted && !dst_trusted) {
-        env->dasics_state.sreg.guard_enable = 1;
         dasics_sreg_guard_reset(&env->dasics_state);
     }
 
@@ -844,7 +843,7 @@ void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong ne
         env->dasics_state.dretpcactz = nextpc;
     }
 
-    if (env->dasics_state.sreg.guard_enable && !src_trusted && dst_trusted) {
+    if (!src_trusted && dst_trusted) {
         dasics_sreg_guard_reset(&env->dasics_state);
     }
 

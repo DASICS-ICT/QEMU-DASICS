@@ -1,6 +1,8 @@
 #ifndef RISCV_DASICS_H
 #define RISCV_DASICS_H
 
+#define MCFG_CSSRG  0x800ul
+#define MCFG_CUSRG  0x400ul
 #define MCFG_CSFT   0x200ul
 #define MCFG_CSLT   0x100ul
 #define MCFG_CSST   0x80ul
@@ -12,8 +14,8 @@
 #define MCFG_UENA   0x2ul
 #define MCFG_SENA   0x1ul
 
-#define UMCFG_MASK (MCFG_CUFT | MCFG_CULT | MCFG_CUST | MCFG_CUET | MCFG_UENA)
-#define SMCFG_MASK (MCFG_CSFT | MCFG_CSLT | MCFG_CSST | MCFG_CSET | MCFG_CUFT | MCFG_CULT | MCFG_CUST | MCFG_CUET | MCFG_UENA | MCFG_SENA)
+#define UMCFG_MASK (MCFG_CUSRG | MCFG_CUFT | MCFG_CULT | MCFG_CUST | MCFG_CUET | MCFG_UENA)
+#define SMCFG_MASK (MCFG_CSSRG | MCFG_CUSRG | MCFG_CSFT | MCFG_CSLT | MCFG_CSST | MCFG_CSET | MCFG_CUFT | MCFG_CULT | MCFG_CUST | MCFG_CUET | MCFG_UENA | MCFG_SENA)
 
 // #define MCFG_UCLS           0x8ul
 // #define MCFG_SCLS           0x4ul
@@ -46,7 +48,6 @@ typedef struct {
 } dasics_bound_t;
 
 typedef struct {
-    uint8_t         guard_enable;
     uint8_t         phase[DASICS_SREG_COUNT];
     uint8_t         saved_once[DASICS_SREG_COUNT];
     target_ulong    sp_off[DASICS_SREG_COUNT]; /* record only offset to sp */
@@ -59,7 +60,7 @@ typedef struct {
 } dasics_sreg_guard_state_t;
 
 typedef struct {
-    uint8_t         maincfg;
+    uint16_t        maincfg;
     dasics_bound_t  smbound;
     dasics_bound_t  umbound;
 
@@ -81,5 +82,6 @@ typedef struct {
 int dasics_in_trusted_zone(CPURISCVState *env, target_ulong pc);
 int dasics_in_active_zone(CPURISCVState *env, target_ulong pc);
 int dasics_match_dlib(CPURISCVState *env, target_ulong addr, target_ulong cfg);
+bool dasics_sreg_guard_enabled(CPURISCVState *env);
 
 #endif
