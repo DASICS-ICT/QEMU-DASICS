@@ -1,6 +1,7 @@
 # cpu_helper.c
 riscv_trap(uint64_t hartid, bool async, uint64_t cause, uint64_t epc, uint64_t tval, const char *desc) "hart:%"PRId64", async:%d, cause:%"PRId64", epc:0x%"PRIx64", tval:0x%"PRIx64", desc=%s"
 riscv_mpk_check(uint64_t pkr, uint64_t pkey, bool pkr_ad, bool pkr_wd) "pkr:0x%"PRIx64", pkey:0x%"PRIx64", pkr_ad:%d, pkr_wd:%d"
+riscv_u_trap_state(uint64_t uepc, uint64_t utvec, uint64_t sedeleg, uint64_t medeleg) "uepc:0x%"PRIx64", utvec:0x%"PRIx64", sedeleg:0x%"PRIx64", medeleg:0x%"PRIx64
 
 # op_helper.c
 riscv_inst_branch(uint64_t pc, uint64_t target) "pc:0x%"PRIx64" target:0x%"PRIx64

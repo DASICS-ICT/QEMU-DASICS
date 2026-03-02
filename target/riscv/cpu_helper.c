@@ -765,7 +765,7 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
                                 target_ulong *fault_pte_addr,
                                 int access_type, int mmu_idx,
                                 bool first_stage, bool two_stage,
-                                bool is_debug)
+                                bool is_debug, target_ulong *leaf_pte)
 {
     /*
      * NOTE: the env->pc value visible here will not be
@@ -907,7 +907,7 @@ restart:
             int vbase_ret = get_physical_address(env, &vbase, &vbase_prot,
                                                  base, NULL, MMU_DATA_LOAD,
                                                  MMUIdx_U, false, true,
-                                                 is_debug);
+                                                 is_debug, NULL);
 
             if (vbase_ret != TRANSLATE_SUCCESS) {
                 if (fault_pte_addr) {
@@ -994,24 +994,6 @@ restart:
     case PTE_W:
     case PTE_W | PTE_X:
         return TRANSLATE_FAIL;
-    }
-
-    /* Check for protection keys */
-    if (riscv_cpu_cfg(env)->mpk) {
-        target_ulong pkr = get_field(env->spkctl, SPKCTL_PKE) ? env->upkru : 0;
-        target_ulong pkey = (pte & PTE_PKEY) >> PKEY_SHIFT;
-        target_ulong pkr_ad = (pkr >> pkey * 2) & PKR_AD;
-        target_ulong pkr_wd = (pkr >> pkey * 2) & PKR_WD;
-
-        if (env->priv == PRV_U && (access_type == MMU_DATA_LOAD || access_type == MMU_DATA_STORE)) {
-            trace_riscv_mpk_check(pkr, pkey, pkr_ad != 0, pkr_wd != 0);
-        }
-
-        if (pkr_ad && (access_type == MMU_DATA_LOAD || access_type == MMU_DATA_STORE)) {
-            return TRANSLATE_PKEY_FAIL;
-        } else if (pkr_wd && access_type == MMU_DATA_STORE) {
-            return TRANSLATE_PKEY_FAIL;
-        }
     }
 
     int prot = 0;
@@ -1123,8 +1105,24 @@ restart:
         prot &= ~PAGE_WRITE;
     }
     *ret_prot = prot;
+    if (leaf_pte) {
+        *leaf_pte = pte;
+    }
 
     return TRANSLATE_SUCCESS;
+}
+
+int riscv_cpu_get_pte_for_mpk(CPURISCVState *env, vaddr addr,
+                              MMUAccessType access_type,
+                              target_ulong *pte)
+{
+    hwaddr pa;
+    int prot;
+    int mmu_idx = cpu_mmu_index(env, false);
+    bool two_stage = mmuidx_2stage(mmu_idx);
+
+    return get_physical_address(env, &pa, &prot, addr, NULL, access_type,
+                                mmu_idx, true, two_stage, false, pte);
 }
 
 static void raise_mmu_exception(CPURISCVState *env, target_ulong address,
@@ -1198,13 +1196,13 @@ hwaddr riscv_cpu_get_phys_page_debug(CPUState *cs, vaddr addr)
     int mmu_idx = cpu_mmu_index(&cpu->env, false);
 
     if (get_physical_address(env, &phys_addr, &prot, addr, NULL, 0, mmu_idx,
-                             true, env->virt_enabled, true)) {
+                             true, env->virt_enabled, true, NULL)) {
         return -1;
     }
 
     if (env->virt_enabled) {
         if (get_physical_address(env, &phys_addr, &prot, phys_addr, NULL,
-                                 0, mmu_idx, false, true, true)) {
+                                 0, mmu_idx, false, true, true, NULL)) {
             return -1;
         }
     }
@@ -1311,7 +1309,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
         /* Two stage lookup */
         ret = get_physical_address(env, &pa, &prot, address,
                                    &env->guest_phys_fault_addr, access_type,
-                                   mmu_idx, true, true, false);
+                                   mmu_idx, true, true, false, NULL);
 
         /*
          * A G-stage exception may be triggered during two state lookup.
@@ -1334,7 +1332,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 
             ret = get_physical_address(env, &pa, &prot2, im_address, NULL,
                                        access_type, MMUIdx_U, false, true,
-                                       false);
+                                       false, NULL);
 
             qemu_log_mask(CPU_LOG_MMU,
                           "%s 2nd-stage address=%" VADDR_PRIx
@@ -1371,7 +1369,8 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     } else {
         /* Single stage lookup */
         ret = get_physical_address(env, &pa, &prot, address, NULL,
-                                   access_type, mmu_idx, true, false, false);
+                                   access_type, mmu_idx, true, false, false,
+                                   NULL);
 
         qemu_log_mask(CPU_LOG_MMU,
                       "%s address=%" VADDR_PRIx " ret %d physical "
@@ -1759,6 +1758,8 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         env->ucause = cause | ((target_ulong)async << (TARGET_LONG_BITS - 1));
         env->uepc = env->pc;
         env->utval = tval;
+        trace_riscv_u_trap_state(env->uepc, env->utvec, env->sedeleg,
+                                 env->medeleg);
         env->pc = (env->utvec >> 2 << 2) +
             ((async && (env->utvec & 3) == 1) ? cause * 4 : 0);
         riscv_cpu_set_mode(env, PRV_U);

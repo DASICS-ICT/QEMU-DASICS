@@ -259,6 +259,7 @@ static bool gen_load_tl(DisasContext *ctx, arg_lb *a, MemOp memop)
     TCGv pc_now = tcg_temp_new();
     gen_pc_plus_diff(pc_now, ctx, 0);
     gen_helper_dasics_ld_check(cpu_env, pc_now, addr);
+    gen_helper_mpk_ld_check(cpu_env, addr);
 #endif
 
     tcg_gen_qemu_ld_tl(dest, addr, ctx->mem_idx, memop);
@@ -363,6 +364,7 @@ static bool gen_store_tl(DisasContext *ctx, arg_sb *a, MemOp memop)
     gen_pc_plus_diff(pc_now, ctx, 0);
     
     gen_helper_dasics_st_check(cpu_env, pc_now, addr);
+    gen_helper_mpk_st_check(cpu_env, addr);
 #endif
 
     tcg_gen_qemu_st_tl(data, addr, ctx->mem_idx, memop);

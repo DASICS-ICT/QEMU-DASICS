@@ -563,6 +563,86 @@ target_ulong helper_hyp_hlvx_wu(CPURISCVState *env, target_ulong addr)
 }
 
 /* DASICS helpers */
+static bool riscv_mpk_prepare(CPURISCVState *env, target_ulong addr,
+                              MMUAccessType access_type, target_ulong *pkr,
+                              target_ulong *pkey, target_ulong *pkr_ad,
+                              target_ulong *pkr_wd)
+{
+    target_ulong pte;
+    int ret;
+
+    if (!riscv_cpu_cfg(env)->mpk) {
+        return false;
+    }
+
+    ret = riscv_cpu_get_pte_for_mpk(env, addr, access_type, &pte);
+    if (ret != TRANSLATE_SUCCESS) {
+        return false;
+    }
+
+    *pkr = get_field(env->spkctl, SPKCTL_PKE) ? env->upkru : 0;
+    *pkey = (pte & PTE_PKEY) >> PKEY_SHIFT;
+    *pkr_ad = (*pkr >> *pkey * 2) & PKR_AD;
+    *pkr_wd = (*pkr >> *pkey * 2) & PKR_WD;
+
+    return true;
+}
+
+static void riscv_mpk_raise_fault(CPURISCVState *env, target_ulong addr,
+                                  MMUAccessType access_type)
+{
+    int mmu_idx = cpu_mmu_index(env, false);
+
+    env->badaddr = addr;
+    env->two_stage_lookup = mmuidx_2stage(mmu_idx);
+    env->two_stage_indirect_lookup = false;
+    riscv_raise_exception(env,
+                          access_type == MMU_DATA_LOAD ?
+                          RISCV_EXCP_PKU_LOAD_ACCESS_FAULT :
+                          RISCV_EXCP_PKU_STORE_ACCESS_FAULT,
+                          GETPC());
+}
+
+void helper_mpk_ld_check(CPURISCVState *env, target_ulong addr)
+{
+    target_ulong pkr, pkey, pkr_ad, pkr_wd;
+
+    if (env->priv != PRV_U) {
+        return;
+    }
+
+    if (!riscv_mpk_prepare(env, addr, MMU_DATA_LOAD, &pkr, &pkey,
+                           &pkr_ad, &pkr_wd)) {
+        return;
+    }
+
+    trace_riscv_mpk_check(pkr, pkey, pkr_ad != 0, pkr_wd != 0);
+
+    if (pkr_ad) {
+        riscv_mpk_raise_fault(env, addr, MMU_DATA_LOAD);
+    }
+}
+
+void helper_mpk_st_check(CPURISCVState *env, target_ulong addr)
+{
+    target_ulong pkr, pkey, pkr_ad, pkr_wd;
+
+    if (env->priv != PRV_U) {
+        return;
+    }
+
+    if (!riscv_mpk_prepare(env, addr, MMU_DATA_STORE, &pkr, &pkey,
+                           &pkr_ad, &pkr_wd)) {
+        return;
+    }
+
+    trace_riscv_mpk_check(pkr, pkey, pkr_ad != 0, pkr_wd != 0);
+
+    if (pkr_ad || pkr_wd) {
+        riscv_mpk_raise_fault(env, addr, MMU_DATA_STORE);
+    }
+}
+
 void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
 {
     if (env->priv == PRV_U) {
