@@ -1003,6 +1003,10 @@ restart:
         target_ulong pkr_ad = (pkr >> pkey * 2) & PKR_AD;
         target_ulong pkr_wd = (pkr >> pkey * 2) & PKR_WD;
 
+        if (env->priv == PRV_U && (access_type == MMU_DATA_LOAD || access_type == MMU_DATA_STORE)) {
+            trace_riscv_mpk_check(pkr, pkey, pkr_ad != 0, pkr_wd != 0);
+        }
+
         if (pkr_ad && (access_type == MMU_DATA_LOAD || access_type == MMU_DATA_STORE)) {
             return TRANSLATE_PKEY_FAIL;
         } else if (pkr_wd && access_type == MMU_DATA_STORE) {

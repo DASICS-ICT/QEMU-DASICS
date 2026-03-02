@@ -4602,9 +4602,7 @@ static RISCVException read_upkru(CPURISCVState *env, int csrno,
 static RISCVException write_upkru(CPURISCVState *env, int csrno,
                                 target_ulong val)
 {
-    target_ulong upkru = env->upkru;
-    target_ulong mask = ~(PKR_WD | PKR_AD);  // Reserve pkey0 as default
-    env->upkru = (upkru & ~mask) | (val & mask);
+    env->upkru = val;
     return RISCV_EXCP_NONE;
 }
 
