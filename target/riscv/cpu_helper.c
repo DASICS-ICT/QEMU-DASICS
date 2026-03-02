@@ -1758,10 +1758,10 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         env->ucause = cause | ((target_ulong)async << (TARGET_LONG_BITS - 1));
         env->uepc = env->pc;
         env->utval = tval;
-        trace_riscv_u_trap_state(env->uepc, env->utvec, env->sedeleg,
-                                 env->medeleg);
         env->pc = (env->utvec >> 2 << 2) +
             ((async && (env->utvec & 3) == 1) ? cause * 4 : 0);
+        trace_riscv_u_trap_state(env->uepc, env->pc, env->utvec,
+            env->sedeleg, env->medeleg);
         riscv_cpu_set_mode(env, PRV_U);
     } else if (env->priv <= PRV_S &&
             cause < TARGET_LONG_BITS && ((deleg >> cause) & 1)) {

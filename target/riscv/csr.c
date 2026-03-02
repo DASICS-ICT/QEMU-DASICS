@@ -30,6 +30,7 @@
 #include "qemu/guest-random.h"
 #include "qapi/error.h"
 #include "dasics.h"
+#include "trace.h"
 
 /* CSR function table public API */
 void riscv_get_csr_ops(int csrno, riscv_csr_operations *ops)
@@ -2877,6 +2878,7 @@ static int write_utvec(CPURISCVState *env, int csrno, target_ulong val)
     /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
     if ((val & 3) < 2) {
         env->utvec = val;
+        trace_riscv_csr_write_utvec(env->utvec, env->utvec);
     } else {
         qemu_log_mask(LOG_UNIMP, "CSR_UTVEC: reserved mode not supported\n");
     }
