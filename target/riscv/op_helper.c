@@ -640,6 +640,27 @@ void helper_dasics_sreg_access_check(CPURISCVState *env, target_ulong pc,
     }
 }
 
+static void dasics_sreg_return_gate_check(CPURISCVState *env,
+                                          target_ulong ret_target)
+{
+    int i;
+
+    if (!dasics_sreg_guard_enabled(env)) {
+        return;
+    }
+
+    for (i = 0; i < DASICS_SREG_COUNT; ++i) {
+        uint8_t phase = env->dasics_state.sreg.phase[i];
+        uint8_t saved_once = env->dasics_state.sreg.saved_once[i];
+        bool phase_ok = (phase == SREG_PHASE_INIT_LOCKED ||
+                         phase == SREG_PHASE_RESTORED_LOCKED);
+
+        if (!phase_ok || saved_once != 0) {
+            dasics_raise_sreg_fault(env, ret_target, DFR_S0_PROTO);
+        }
+    }
+}
+
 target_ulong helper_dasics_sreg_store_gate(CPURISCVState *env, target_ulong pc,
                                            uint32_t regno, uint32_t rs1,
                                            target_ulong addr, target_ulong plain)
@@ -845,6 +866,7 @@ void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong ne
     }
 
     if (!src_trusted && dst_trusted) {
+        dasics_sreg_return_gate_check(env, newpc);
         dasics_sreg_guard_reset(&env->dasics_state);
     }
 
