@@ -680,6 +680,7 @@ target_ulong helper_dasics_sreg_store_gate(CPURISCVState *env, target_ulong pc,
     env->dasics_state.sreg.shadow_tag_lo[slot] = tag_lo;
     env->dasics_state.sreg.shadow_tag_hi[slot] = tag_hi;
     env->dasics_state.sreg.saved_once[slot] = 1;
+    env->gpr[regno] = cipher;
     env->dasics_state.sreg.phase[slot] = SREG_PHASE_ACTIVE;
     return cipher;
 }
