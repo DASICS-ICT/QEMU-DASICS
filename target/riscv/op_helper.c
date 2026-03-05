@@ -596,10 +596,10 @@ static void riscv_mpk_raise_fault(CPURISCVState *env, target_ulong addr,
     env->badaddr = addr;
     env->two_stage_lookup = mmuidx_2stage(mmu_idx);
     env->two_stage_indirect_lookup = false;
+    env->dasics_state.dfreason = access_type == MMU_DATA_LOAD ?
+                                 DFR_MPK_LD : DFR_MPK_ST;
     riscv_raise_exception(env,
-                          access_type == MMU_DATA_LOAD ?
-                          RISCV_EXCP_PKU_LOAD_ACCESS_FAULT :
-                          RISCV_EXCP_PKU_STORE_ACCESS_FAULT,
+                          RISCV_EXCP_DASICS_U_CHECK_FAULT,
                           GETPC());
 }
 

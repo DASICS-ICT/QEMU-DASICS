@@ -34,6 +34,15 @@
 #include "tcg/oversized-guest.h"
 #include "dasics.h"
 
+#define RISCV_DASICS_DFREASON_STR(_dfreason) \
+    (((_dfreason) == DFR_EF) ? "dasics ecall fault" : \
+     ((_dfreason) == DFR_LF) ? "dasics load fault" : \
+     ((_dfreason) == DFR_SF) ? "dasics store fault" : \
+     ((_dfreason) == DFR_JF) ? "dasics jump fault" : \
+     ((_dfreason) == DFR_MPK_LD) ? "mpk load fault" : \
+     ((_dfreason) == DFR_MPK_ST) ? "mpk store fault" : \
+     "unknown")
+
 int riscv_cpu_mmu_index(CPURISCVState *env, bool ifetch)
 {
 #ifdef CONFIG_USER_ONLY
@@ -1741,6 +1750,14 @@ void riscv_cpu_do_interrupt(CPUState *cs)
 
     trace_riscv_trap(env->mhartid, async, cause, env->pc, tval,
                      riscv_cpu_get_trap_name(cause, async));
+    if (!async &&
+        (cause == RISCV_EXCP_DASICS_U_CHECK_FAULT ||
+         cause == RISCV_EXCP_DASICS_S_CHECK_FAULT ||
+         cause == RISCV_EXCP_PKU_LOAD_ACCESS_FAULT ||
+         cause == RISCV_EXCP_PKU_STORE_ACCESS_FAULT)) {
+        trace_riscv_dasics_mpk_exception(
+            env->pc, tval, RISCV_DASICS_DFREASON_STR(env->dasics_state.dfreason));
+    }
 
     qemu_log_mask(CPU_LOG_INT,
                   "%s: hart:"TARGET_FMT_ld", async:%d, cause:"TARGET_FMT_lx", "

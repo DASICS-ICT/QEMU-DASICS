@@ -770,6 +770,8 @@ typedef enum RISCVException {
 #define DFR_LF  2 // dasics load fault
 #define DFR_SF  3 // dasics store fault
 #define DFR_JF  4 // dasics jump 
+#define DFR_MPK_LD 5 // mpk load fault
+#define DFR_MPK_ST 6 // mpk store fault
 
 /* Interrupt causes */
 #define IRQ_U_SOFT                         0
