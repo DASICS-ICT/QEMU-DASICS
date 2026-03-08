@@ -603,9 +603,14 @@ static void riscv_mpk_raise_fault(CPURISCVState *env, target_ulong addr,
                           GETPC());
 }
 
-void helper_mpk_ld_check(CPURISCVState *env, target_ulong addr)
+void helper_mpk_ld_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
 {
     target_ulong pkr, pkey, pkr_ad, pkr_wd;
+
+    // Access from trusted code zone bypasses MPK checks.
+    if (dasics_in_trusted_zone(env, pc)) {
+        return;
+    }
 
     if (env->priv != PRV_U) {
         return;
@@ -623,9 +628,14 @@ void helper_mpk_ld_check(CPURISCVState *env, target_ulong addr)
     }
 }
 
-void helper_mpk_st_check(CPURISCVState *env, target_ulong addr)
+void helper_mpk_st_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
 {
     target_ulong pkr, pkey, pkr_ad, pkr_wd;
+
+    // Access from trusted code zone bypasses MPK checks.
+    if (dasics_in_trusted_zone(env, pc)) {
+        return;
+    }
 
     if (env->priv != PRV_U) {
         return;

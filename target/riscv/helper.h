@@ -138,8 +138,8 @@ DEF_HELPER_1(tlb_flush_all, void, env)
 /* DASICS helpers */
 DEF_HELPER_3(dasics_ld_check, void, env, tl, tl)
 DEF_HELPER_3(dasics_st_check, void, env, tl, tl)
-DEF_HELPER_2(mpk_ld_check, void, env, tl)
-DEF_HELPER_2(mpk_st_check, void, env, tl)
+DEF_HELPER_3(mpk_ld_check, void, env, tl, tl)
+DEF_HELPER_3(mpk_st_check, void, env, tl, tl)
 DEF_HELPER_4(dasics_call, void, env, tl, tl, tl)
 DEF_HELPER_4(dasics_redirect, void, env, tl, tl, tl)
 /* Native Debug */
