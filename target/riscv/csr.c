@@ -4500,9 +4500,11 @@ static RISCVException read_dumbound(CPURISCVState *env, int csrno, target_ulong 
 {
     switch(csrno) {
     case CSR_DUMBOUND0:
+    case CSR_DUMBOUND0_UL:
         *val = env->dasics_state.umbound.lo;
         break;
     case CSR_DUMBOUND1:
+    case CSR_DUMBOUND1_UL:
         *val = env->dasics_state.umbound.hi;
         break;
     default:
@@ -4518,9 +4520,11 @@ static RISCVException write_dumbound(CPURISCVState *env, int csrno, target_ulong
 {
     switch(csrno) {
     case CSR_DUMBOUND0:
+    case CSR_DUMBOUND0_UL:
         env->dasics_state.umbound.lo = val;
         break;
     case CSR_DUMBOUND1:
+    case CSR_DUMBOUND1_UL:
         env->dasics_state.umbound.hi = val;
         break;
     default:
@@ -5336,6 +5340,9 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_DUMCFG]         = {"dumcfg",       dasics,     read_dumcfg,    write_dumcfg    },
     [CSR_DUMBOUND0]      = {"dumbound0",    dasics,     read_dumbound,  write_dumbound  },
     [CSR_DUMBOUND1]      = {"dumbound1",    dasics,     read_dumbound,  write_dumbound  },
+    [CSR_DUMCFG_UL]      = {"dumcfg_ul",    dasics,     read_dumcfg,    write_dumcfg    },
+    [CSR_DUMBOUND0_UL]   = {"dumbound0_ul", dasics,     read_dumbound,  write_dumbound  },
+    [CSR_DUMBOUND1_UL]   = {"dumbound1_ul", dasics,     read_dumbound,  write_dumbound  },
 
     [CSR_DLCFG]          = {"dlcfg",       dasics,     read_dlcfg,     write_dlcfg     },
 

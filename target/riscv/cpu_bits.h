@@ -383,6 +383,10 @@
 #define CSR_DUMCFG          0x9e0
 #define CSR_DUMBOUND0       0x9e2
 #define CSR_DUMBOUND1       0x9e3
+/* DASICS U-logic aliases (map to DUM physical state) */
+#define CSR_DUMCFG_UL       0x8e0
+#define CSR_DUMBOUND0_UL    0x8e2
+#define CSR_DUMBOUND1_UL    0x8e3
 
 #define CSR_DLCFG           0x880
 #define CSR_DLBOUND0        0x890
