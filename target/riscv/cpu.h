@@ -125,6 +125,15 @@ typedef struct PMUCTRState {
     target_ulong irq_overflow_left;
 } PMUCTRState;
 
+typedef struct RISCVMemCheckState {
+    bool active;
+    bool dasics_pass;
+    bool mpk_pass;
+    uint32_t exception;
+    target_ulong badaddr;
+    target_ulong dfreason;
+} RISCVMemCheckState;
+
 struct CPUArchState {
     target_ulong gpr[32];
     target_ulong gprh[32]; /* 64 top bits of the 128-bit registers */
@@ -173,6 +182,7 @@ struct CPUArchState {
 #endif
 
     dasics_table_t dasics_state;
+    RISCVMemCheckState mem_check_state;
     /* memory protection keys */
     target_ulong upkru;
     target_ulong spkctl;

@@ -588,19 +588,33 @@ static bool riscv_mpk_prepare(CPURISCVState *env, target_ulong addr,
     return true;
 }
 
-static void riscv_mpk_raise_fault(CPURISCVState *env, target_ulong addr,
-                                  MMUAccessType access_type)
+static void riscv_mem_check_reset(CPURISCVState *env)
 {
-    int mmu_idx = cpu_mmu_index(env, false);
+    env->mem_check_state.active = true;
+    env->mem_check_state.dasics_pass = true;
+    env->mem_check_state.mpk_pass = true;
+    env->mem_check_state.exception = 0;
+    env->mem_check_state.badaddr = 0;
+    env->mem_check_state.dfreason = 0;
+}
 
-    env->badaddr = addr;
-    env->two_stage_lookup = mmuidx_2stage(mmu_idx);
-    env->two_stage_indirect_lookup = false;
-    env->dasics_state.dfreason = access_type == MMU_DATA_LOAD ?
-                                 DFR_MPK_LD : DFR_MPK_ST;
-    riscv_raise_exception(env,
-                          RISCV_EXCP_DASICS_U_CHECK_FAULT,
-                          GETPC());
+static void riscv_mem_check_record_fault(CPURISCVState *env, uint32_t exception,
+                                         target_ulong badaddr,
+                                         target_ulong dfreason)
+{
+    env->mem_check_state.exception = exception;
+    env->mem_check_state.badaddr = badaddr;
+    env->mem_check_state.dfreason = dfreason;
+}
+
+static void riscv_mpk_record_fault(CPURISCVState *env, target_ulong addr,
+                                   MMUAccessType access_type)
+{
+    target_ulong reason = access_type == MMU_DATA_LOAD ? DFR_MPK_LD : DFR_MPK_ST;
+
+    env->mem_check_state.mpk_pass = false;
+    riscv_mem_check_record_fault(env, RISCV_EXCP_DASICS_U_CHECK_FAULT,
+                                 addr, reason);
 }
 
 void helper_mpk_ld_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
@@ -624,7 +638,7 @@ void helper_mpk_ld_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
     trace_riscv_mpk_check(pkr, pkey, pkr_ad != 0, pkr_wd != 0);
 
     if (pkr_ad) {
-        riscv_mpk_raise_fault(env, addr, MMU_DATA_LOAD);
+        riscv_mpk_record_fault(env, addr, MMU_DATA_LOAD);
     }
 }
 
@@ -649,12 +663,14 @@ void helper_mpk_st_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
     trace_riscv_mpk_check(pkr, pkey, pkr_ad != 0, pkr_wd != 0);
 
     if (pkr_ad || pkr_wd) {
-        riscv_mpk_raise_fault(env, addr, MMU_DATA_STORE);
+        riscv_mpk_record_fault(env, addr, MMU_DATA_STORE);
     }
 }
 
 void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
 {
+    riscv_mem_check_reset(env);
+
     if (env->priv == PRV_U) {
         trace_riscv_inst_load(pc, addr);
     }
@@ -671,14 +687,15 @@ void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong ad
         uint32_t exception = (env->priv == PRV_U) ?
                                 RISCV_EXCP_DASICS_U_CHECK_FAULT:
                                 RISCV_EXCP_DASICS_S_CHECK_FAULT;
-        env->badaddr = addr;
-        env->dasics_state.dfreason = DFR_LF;
-        riscv_raise_exception(env, exception, GETPC());
+        env->mem_check_state.dasics_pass = false;
+        riscv_mem_check_record_fault(env, exception, addr, DFR_LF);
     }
 }
 
 void helper_dasics_st_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
 {
+    riscv_mem_check_reset(env);
+
     if (env->priv == PRV_U) {
         trace_riscv_inst_store(pc, addr);
     }
@@ -695,10 +712,31 @@ void helper_dasics_st_check(CPURISCVState *env, target_ulong pc, target_ulong ad
         uint32_t exception = (env->priv == PRV_U) ?
                                 RISCV_EXCP_DASICS_U_CHECK_FAULT:
                                 RISCV_EXCP_DASICS_S_CHECK_FAULT;
-        env->badaddr = addr;
-        env->dasics_state.dfreason = DFR_SF;
-        riscv_raise_exception(env, exception, GETPC());
+        env->mem_check_state.dasics_pass = false;
+        riscv_mem_check_record_fault(env, exception, addr, DFR_SF);
     }
+}
+
+void helper_check_fault(CPURISCVState *env)
+{
+    int mmu_idx;
+
+    if (!env->mem_check_state.active) {
+        return;
+    }
+
+    if (env->mem_check_state.dasics_pass || env->mem_check_state.mpk_pass) {
+        env->mem_check_state.active = false;
+        return;
+    }
+
+    mmu_idx = cpu_mmu_index(env, false);
+    env->badaddr = env->mem_check_state.badaddr;
+    env->two_stage_lookup = mmuidx_2stage(mmu_idx);
+    env->two_stage_indirect_lookup = false;
+    env->dasics_state.dfreason = env->mem_check_state.dfreason;
+    env->mem_check_state.active = false;
+    riscv_raise_exception(env, env->mem_check_state.exception, GETPC());
 }
 
 void helper_dasics_call(CPURISCVState *env, target_ulong pc, target_ulong newpc, target_ulong nextpc)
