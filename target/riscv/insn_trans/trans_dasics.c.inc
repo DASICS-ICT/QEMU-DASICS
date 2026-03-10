@@ -75,7 +75,7 @@ static bool trans_dasicscalljr(DisasContext *ctx, arg_dasicscalljr *a)
     TCGv pc_now = tcg_temp_new();
     gen_pc_plus_diff(pc_now, ctx, 0);
     
-    gen_helper_dasics_call(cpu_env, pc_now, target_pc, succ_pc);
+    gen_helper_dasics_call_jr(cpu_env, pc_now, target_pc, succ_pc);
 
 #endif
 

@@ -8,6 +8,7 @@ riscv_csr_write_utvec(uint64_t val, uint64_t mode) "val:0x%"PRIx64", newval:0x%"
 
 # op_helper.c
 riscv_inst_branch(uint64_t pc, uint64_t target) "pc:0x%"PRIx64" target:0x%"PRIx64
+riscv_inst_dasicscalljr(uint64_t pc, uint64_t target) "pc:0x%"PRIx64" target:0x%"PRIx64
 riscv_inst_load(uint64_t pc, uint64_t addr) "pc:0x%"PRIx64" addr:0x%"PRIx64
 riscv_inst_store(uint64_t pc, uint64_t addr) "pc:0x%"PRIx64" addr:0x%"PRIx64
 

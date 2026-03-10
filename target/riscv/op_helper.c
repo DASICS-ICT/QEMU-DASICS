@@ -760,6 +760,14 @@ void helper_dasics_call(CPURISCVState *env, target_ulong pc, target_ulong newpc,
 
 }
 
+void helper_dasics_call_jr(CPURISCVState *env, target_ulong pc, target_ulong newpc, target_ulong nextpc)
+{
+    if (env->priv == PRV_U) {
+        trace_riscv_inst_dasicscalljr(pc, newpc);
+    }
+    helper_dasics_call(env, pc, newpc, nextpc);
+}
+
 void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong newpc, target_ulong nextpc)
 {
     if (env->priv == PRV_U) {

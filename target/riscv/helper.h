@@ -142,6 +142,7 @@ DEF_HELPER_3(mpk_ld_check, void, env, tl, tl)
 DEF_HELPER_3(mpk_st_check, void, env, tl, tl)
 DEF_HELPER_1(check_fault, void, env)
 DEF_HELPER_4(dasics_call, void, env, tl, tl, tl)
+DEF_HELPER_4(dasics_call_jr, void, env, tl, tl, tl)
 DEF_HELPER_4(dasics_redirect, void, env, tl, tl, tl)
 /* Native Debug */
 DEF_HELPER_1(itrigger_match, void, env)
