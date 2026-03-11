@@ -421,7 +421,7 @@ static const VMStateDescription dasics_boundary = {
 
 static const VMStateDescription dasics_state = {
     .name = "cpu/dasics",
-    .version_id = 4,
+    .version_id = 5,
     .minimum_version_id = 1,
     .needed = dasics_needed,
     .fields = (VMStateField[]) {
@@ -446,6 +446,7 @@ static const VMStateDescription dasics_state = {
         VMSTATE_UNUSED_TEST(dasics_guard_enable_v2_v3, 1),
         VMSTATE_UINT8_ARRAY_V(sreg.phase, dasics_table_t, DASICS_SREG_COUNT, 2),
         VMSTATE_UINT8_ARRAY_V(sreg.saved_once, dasics_table_t, DASICS_SREG_COUNT, 2),
+        VMSTATE_UINTTL_ARRAY_V(sreg.saved_addr, dasics_table_t, DASICS_SREG_COUNT, 5),
         VMSTATE_UINTTL_ARRAY_V(sreg.sp_off, dasics_table_t, DASICS_SREG_COUNT, 2),
         VMSTATE_UINTTL_ARRAY_V(sreg.shadow_cipher, dasics_table_t, DASICS_SREG_COUNT, 2),
         VMSTATE_UINT8_V(sreg.crypto_algo, dasics_table_t, 2),

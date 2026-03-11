@@ -331,6 +331,7 @@ static TCGv get_gpr(DisasContext *ctx, int reg_num, DisasExtend ext)
         bool is_sd_source = ctx->cur_insn_len == 4 &&
                             extract32(ctx->opcode, 0, 7) == 0x23 &&
                             extract32(ctx->opcode, 12, 3) == 0x3 &&
+                            extract32(ctx->opcode, 15, 5) == 2 &&
                             extract32(ctx->opcode, 20, 5) == reg_num;
         if (!is_sd_source) {
             TCGv pc_now = tcg_temp_new();
@@ -400,6 +401,7 @@ static void gen_set_gpr(DisasContext *ctx, int reg_num, TCGv t)
             bool is_ld_dest = ctx->cur_insn_len == 4 &&
                               extract32(ctx->opcode, 0, 7) == 0x03 &&
                               extract32(ctx->opcode, 12, 3) == 0x3 &&
+                              extract32(ctx->opcode, 15, 5) == 2 &&
                               extract32(ctx->opcode, 7, 5) == reg_num;
             if (!is_ld_dest) {
                 TCGv pc_now = tcg_temp_new();

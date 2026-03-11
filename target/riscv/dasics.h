@@ -50,6 +50,7 @@ typedef struct {
 typedef struct {
     uint8_t         phase[DASICS_SREG_COUNT];
     uint8_t         saved_once[DASICS_SREG_COUNT];
+    target_ulong    saved_addr[DASICS_SREG_COUNT];
     target_ulong    sp_off[DASICS_SREG_COUNT]; /* record only offset to sp */
     target_ulong    shadow_cipher[DASICS_SREG_COUNT];
     /* crypto framework v1 draft state (algorithm-swappable path) */
