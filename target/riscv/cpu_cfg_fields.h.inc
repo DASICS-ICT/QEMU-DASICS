@@ -54,6 +54,7 @@ BOOL_FIELD(ext_sscsrind)
 BOOL_FIELD(ext_ssdbltrp)
 BOOL_FIELD(ext_smdbltrp)
 BOOL_FIELD(ext_svadu)
+BOOL_FIELD(ext_svatag)
 BOOL_FIELD(ext_svinval)
 BOOL_FIELD(ext_svnapot)
 BOOL_FIELD(ext_svpbmt)
@@ -133,6 +134,8 @@ BOOL_FIELD(has_priv_1_11)
 
 /* Always enabled for TCG if has_priv_1_11 */
 BOOL_FIELD(ext_ziccrse)
+BOOL_FIELD(ext_zicclsm)
+BOOL_FIELD(ext_dasics)
 
 /* Vendor-specific custom extensions */
 BOOL_FIELD(ext_xtheadba)

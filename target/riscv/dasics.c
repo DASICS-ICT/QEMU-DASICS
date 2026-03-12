@@ -1,18 +1,5 @@
 #include "qemu/osdep.h"
-#include "qemu/log.h"
-#include "qemu/main-loop.h"
 #include "cpu.h"
-#include "internals.h"
-#include "pmu.h"
-#include "exec/exec-all.h"
-#include "instmap.h"
-#include "tcg/tcg-op.h"
-#include "trace.h"
-#include "semihosting/common-semi.h"
-#include "sysemu/cpu-timers.h"
-#include "cpu_bits.h"
-#include "debug.h"
-#include "tcg/oversized-guest.h"
 #include "dasics.h"
 
 int dasics_in_trusted_zone(CPURISCVState *env, target_ulong pc) 

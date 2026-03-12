@@ -162,6 +162,16 @@ static bool trans_jalr(DisasContext *ctx, arg_jalr *a)
     }
 
     gen_pc_plus_diff(succ_pc, ctx, ctx->cur_insn_len);
+
+    // DASICS check before update rd and pc
+#ifndef CONFIG_USER_ONLY
+    TCGv pc_now = tcg_temp_new();
+    gen_pc_plus_diff(pc_now, ctx, 0);
+
+    gen_helper_dasics_redirect(tcg_env, pc_now, target_pc, succ_pc);
+
+#endif
+
     gen_set_gpr(ctx, a->rd, succ_pc);
 
 #ifndef CONFIG_USER_ONLY
@@ -321,6 +331,18 @@ static bool gen_branch(DisasContext *ctx, arg_b *a, TCGCond cond)
             gen_pc_plus_diff(dest, ctx, a->imm);
             gen_helper_ctr_add_entry(tcg_env, src, dest, type);
         }
+
+	    // DASICS checks 
+            TCGv succ_pc = tcg_temp_new();
+            TCGv target_pc = tcg_temp_new();
+            TCGv pc_now = tcg_temp_new();
+            gen_pc_plus_diff(succ_pc, ctx, ctx->cur_insn_len);
+            gen_pc_plus_diff(target_pc, ctx, a->imm);
+
+            gen_pc_plus_diff(pc_now, ctx, 0);
+
+            gen_helper_dasics_redirect(tcg_env, pc_now, target_pc, succ_pc);
+
 #endif
         gen_goto_tb(ctx, 0, a->imm);
     }
@@ -364,6 +386,14 @@ static bool gen_load_tl(DisasContext *ctx, arg_lb *a, MemOp memop)
 {
     TCGv dest = dest_gpr(ctx, a->rd);
     TCGv addr = get_address(ctx, a->rs1, a->imm);
+
+    // DASICS load checks
+#ifndef CONFIG_USER_ONLY
+    TCGv pc_now = tcg_temp_new();
+    gen_pc_plus_diff(pc_now, ctx, 0);
+    gen_helper_dasics_ld_check(tcg_env, pc_now, addr);
+#endif
+
 
     tcg_gen_qemu_ld_tl(dest, addr, ctx->mem_idx, memop);
     gen_set_gpr(ctx, a->rd, dest);
@@ -473,6 +503,14 @@ static bool gen_store_tl(DisasContext *ctx, arg_sb *a, MemOp memop)
 {
     TCGv addr = get_address(ctx, a->rs1, a->imm);
     TCGv data = get_gpr(ctx, a->rs2, EXT_NONE);
+
+    // DASICS store checks
+#ifndef CONFIG_USER_ONLY
+    TCGv pc_now = tcg_temp_new();
+    gen_pc_plus_diff(pc_now, ctx, 0);
+
+    gen_helper_dasics_st_check(tcg_env, pc_now, addr);
+#endif
 
     if (ctx->ztso) {
         tcg_gen_mb(TCG_MO_ALL | TCG_BAR_STRL);
