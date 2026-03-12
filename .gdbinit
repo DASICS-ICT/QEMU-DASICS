@@ -6,3 +6,16 @@
 
 # Load QEMU-specific sub-commands and settings
 source scripts/qemu-gdb.py
+
+file ./build/qemu-system-riscv64
+
+
+run -M virt -m 1G \
+        -nographic -kernel /home/wanghan/Workspace/riscv-pk-qemu/build/bbl \
+        -append "console=ttyS0 rw root=/dev/vda" \
+        -bios none
+
+# b cpu-exec.c:971
+# if ((RISCVHartArrayState *)0x5555566252d8).harts[0].env.pc == 0x80002048
+
+# c
