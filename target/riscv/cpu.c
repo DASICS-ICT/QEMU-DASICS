@@ -327,6 +327,9 @@ static const char * const riscv_excp_names[] = {
     "guest_load_page_fault",
     "reserved",
     "guest_store_page_fault",
+    /* add DASICS faults */
+    "dasics_user_check_fault",
+    "dasics_supervisor_check_fault",
 };
 
 static const char * const riscv_intr_names[] = {
@@ -735,6 +738,7 @@ static void riscv_cpu_reset_hold(Object *obj, ResetType type)
         iprio = riscv_cpu_default_priority(i);
         env->miprio[i] = (i == IRQ_M_EXT) ? 0 : iprio;
         env->siprio[i] = (i == IRQ_S_EXT) ? 0 : iprio;
+        env->uiprio[i] = (i == IRQ_U_EXT) ? 0 : iprio;
         env->hviprio[i] = 0;
     }
     i = 0;
@@ -1169,6 +1173,7 @@ static const MISAExtInfo misa_ext_info_arr[] = {
     MISA_EXT_INFO(RVS, "s", "Supervisor-level instructions"),
     MISA_EXT_INFO(RVU, "u", "User-level instructions"),
     MISA_EXT_INFO(RVH, "h", "Hypervisor"),
+    MISA_EXT_INFO(RVN, "n", "N extension User-Level Interrupts"),
     MISA_EXT_INFO(RVV, "v", "Vector operations"),
     MISA_EXT_INFO(RVG, "g", "General purpose (IMAFD_Zicsr_Zifencei)"),
     MISA_EXT_INFO(RVB, "b", "Bit manipulation (Zba_Zbb_Zbs)")
@@ -1268,6 +1273,10 @@ const RISCVCPUMultiExtConfig riscv_cpu_extensions[] = {
     MULTI_EXT_CFG_BOOL("zvfbfwma", ext_zvfbfwma, false),
     MULTI_EXT_CFG_BOOL("zvfh", ext_zvfh, false),
     MULTI_EXT_CFG_BOOL("zvfhmin", ext_zvfhmin, false),
+
+    /* add DASICS extension here? */
+    MULTI_EXT_CFG_BOOL("dasics", ext_dasics, false),
+
     MULTI_EXT_CFG_BOOL("sstc", ext_sstc, true),
     MULTI_EXT_CFG_BOOL("ssnpm", ext_ssnpm, false),
     MULTI_EXT_CFG_BOOL("sspm", ext_sspm, false),
@@ -1284,6 +1293,10 @@ const RISCVCPUMultiExtConfig riscv_cpu_extensions[] = {
     MULTI_EXT_CFG_BOOL("ssdbltrp", ext_ssdbltrp, false),
     MULTI_EXT_CFG_BOOL("svade", ext_svade, false),
     MULTI_EXT_CFG_BOOL("svadu", ext_svadu, true),
+
+    /* TODO: add memory tagging storage area extension */
+    MULTI_EXT_CFG_BOOL("svatag", ext_svatag, false),
+
     MULTI_EXT_CFG_BOOL("svinval", ext_svinval, false),
     MULTI_EXT_CFG_BOOL("svnapot", ext_svnapot, false),
     MULTI_EXT_CFG_BOOL("svpbmt", ext_svpbmt, false),
@@ -3227,7 +3240,7 @@ static const TypeInfo riscv_cpu_type_infos[] = {
 
     DEFINE_RISCV_CPU(TYPE_RISCV_CPU_XIANGSHAN_NANHU, TYPE_RISCV_VENDOR_CPU,
         .misa_mxl_max = MXL_RV64,
-        .misa_ext = RVG | RVC | RVB | RVS | RVU,
+        .misa_ext = RVG | RVC | RVB | RVS | RVU | RVN,
         .priv_spec = PRIV_VERSION_1_12_0,
 
         /* ISA extensions */
@@ -3241,6 +3254,46 @@ static const TypeInfo riscv_cpu_type_infos[] = {
         .cfg.ext_zksed = true,
         .cfg.ext_zksh = true,
         .cfg.ext_svinval = true,
+
+        .cfg.mmu = true,
+        .cfg.pmp = true,
+
+        .cfg.max_satp_mode = VM_1_10_SV39,
+    ),
+
+    /* TODO: add new CPU configurations for Xiangshan Nanhu DASICS? */
+
+    DEFINE_RISCV_CPU(TYPE_RISCV_CPU_XIANGSHAN_DASICS, TYPE_RISCV_VENDOR_CPU,
+        .misa_mxl_max = MXL_RV64,
+        .misa_ext = RVG | RVC | RVB | RVS | RVU | RVN,
+        .priv_spec = PRIV_VERSION_1_13_0,
+
+	/* TODO: add addtional extensions for memory tagging */
+    	.cfg.ext_zimop = false,
+    	.cfg.ext_zicclsm = false,
+
+        /* ISA extensions */
+        .cfg.ext_zbc = true,
+        .cfg.ext_zbkb = true,
+        .cfg.ext_zbkc = true,
+        .cfg.ext_zbkx = true,
+        .cfg.ext_zknd = true,
+        .cfg.ext_zkne = true,
+        .cfg.ext_zknh = true,
+        .cfg.ext_zksed = true,
+        .cfg.ext_zksh = true,
+        .cfg.ext_svinval = true,
+
+	/* TODO: add addtional extensions for dasics */
+	.cfg.ext_dasics = true,
+
+	/* extensions for pointer masking */
+    	.cfg.ext_ssnpm = false,
+    	.cfg.ext_smnpm = false,
+    	.cfg.ext_smmpm = false,
+	
+	/* extensions for storing tags */
+	.cfg.ext_svatag = false,
 
         .cfg.mmu = true,
         .cfg.pmp = true,
