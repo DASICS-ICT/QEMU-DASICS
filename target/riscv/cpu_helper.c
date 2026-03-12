@@ -38,6 +38,8 @@
 #include "pmp.h"
 #include "qemu/plugin.h"
 
+#include "dasics.h"
+
 int riscv_env_mmu_index(CPURISCVState *env, bool ifetch)
 {
 #ifdef CONFIG_USER_ONLY
@@ -466,9 +468,10 @@ int riscv_cpu_vsirq_pending(CPURISCVState *env)
                                     (irqs | irqs_f_vs), env->hviprio);
 }
 
+/* TODO: add RISCV N extension */
 static int riscv_cpu_local_irq_pending(CPURISCVState *env)
 {
-    uint64_t irqs, pending, mie, hsie, vsie, irqs_f, irqs_f_vs;
+    uint64_t irqs, pending, mie, hsie, vsie, uie, irqs_f, irqs_f_vs;
     uint64_t vsbits, irq_delegated;
     int virq;
 
@@ -490,11 +493,13 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
         hsie = 1;
         vsie = (env->priv < PRV_S) ||
                (env->priv == PRV_S && get_field(env->mstatus, MSTATUS_SIE));
+	uie = 1;
     } else {
         mie = (env->priv < PRV_M) ||
               (env->priv == PRV_M && get_field(env->mstatus, MSTATUS_MIE));
         hsie = (env->priv < PRV_S) ||
                (env->priv == PRV_S && get_field(env->mstatus, MSTATUS_SIE));
+	uie = (env->priv == PRV_U && get_field(env->mstatus, MSTATUS_UIE));
         vsie = 0;
     }
 
@@ -512,7 +517,7 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
     irqs_f = env->mvip & (env->mvien & ~env->mideleg) & env->sie;
 
     /* Check HS-mode interrupts */
-    irqs =  ((pending & env->mideleg & ~env->hideleg) | irqs_f) & -hsie;
+    irqs =  ((pending & env->mideleg & ~env->hideleg & ~env->sideleg) | irqs_f) & -hsie; // where to add sideleg???
     if (irqs) {
         return riscv_cpu_pending_to_irq(env, IRQ_S_EXT, IPRIO_DEFAULT_S,
                                         irqs, env->siprio);
@@ -522,7 +527,7 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
     irqs_f_vs = env->hvip & env->hvien & ~env->hideleg & env->vsie;
 
     /* Check VS-mode interrupts */
-    irq_delegated = pending & env->mideleg & env->hideleg;
+    irq_delegated = pending & env->mideleg & env->hideleg & ~env->sideleg; // where to add sideleg???
 
     /* Bring VS-level bits to correct position */
     vsbits = irq_delegated & VS_MODE_INTERRUPTS;
@@ -538,6 +543,13 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
         } else {
             return virq + 1;
         }
+    }
+
+    /* TODO: Check U-mode interrupts */
+    irqs = pending & env->mideleg & env->sideleg & -uie;
+    if (irqs) {
+        return riscv_cpu_pending_to_irq(env, IRQ_U_EXT, IPRIO_DEFAULT_LOWER,
+                                        irqs, env->uiprio);
     }
 
     /* Indicate no pending interrupt */
@@ -2168,6 +2180,8 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     bool async = !!(cs->exception_index & RISCV_EXCP_INT_FLAG);
     target_ulong cause = cs->exception_index & RISCV_EXCP_INT_MASK;
     uint64_t deleg = async ? env->mideleg : env->medeleg;
+    uint64_t delegS = riscv_has_ext(env, RVN) ? \
+        (async ? env->sideleg : env->sedeleg) : 0;
     bool s_injected = env->mvip & (1ULL << cause) & env->mvien &&
         !(env->mip & (1ULL << cause));
     bool vs_injected = env->hvip & (1ULL << cause) & env->hvien &&
@@ -2181,7 +2195,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     target_ulong tinst = 0;
     target_ulong htval = 0;
     target_ulong mtval2 = 0;
-    target_ulong src;
+    target_ulong src = env->pc;
     int sxlen = 0;
     int mxlen = 16 << riscv_cpu_mxl(env);
     bool nnmi_excep = false;
@@ -2210,6 +2224,10 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         case RISCV_EXCP_STORE_AMO_ACCESS_FAULT:
         case RISCV_EXCP_LOAD_PAGE_FAULT:
         case RISCV_EXCP_STORE_PAGE_FAULT:
+        /* DASICS Exception number */
+        case RISCV_EXCP_DASICS_U_CHECK_FAULT:
+        case RISCV_EXCP_DASICS_S_CHECK_FAULT:
+
             if (always_storeamo) {
                 cause = promote_load_fault(cause);
             }
@@ -2273,6 +2291,16 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             } else if (env->priv == PRV_U) {
                 cause = RISCV_EXCP_U_ECALL;
             }
+
+            /* check whether this ecall comes from untrusted zone */
+            bool is_trusted = dasics_in_trusted_zone(env, env->pc);
+            bool untrusted_u = env->priv == PRV_U && !is_trusted && !(env->dasics_state.maincfg & MCFG_CUET);
+            bool untrusted_s = env->priv == PRV_S && !is_trusted && !(env->dasics_state.maincfg & MCFG_CSET);
+            cause = (untrusted_s) ? RISCV_EXCP_DASICS_S_CHECK_FAULT :
+                    (untrusted_u) ? RISCV_EXCP_DASICS_U_CHECK_FAULT :
+                                    cause;
+            if (untrusted_s || untrusted_u) env->dasics_state.dfreason = DFR_EF;
+
         }
     }
 
@@ -2290,6 +2318,23 @@ void riscv_cpu_do_interrupt(CPUState *cs)
 
     vsmode_exc = env->virt_enabled && cause < 64 &&
         (((hdeleg >> cause) & 1) || vs_injected);
+
+    /* TODO: add U-mode trap check ??? */
+    if (riscv_has_ext(env, RVN) && env->priv == PRV_U &&
+            cause < TARGET_LONG_BITS && ((delegS >> cause) & 1)) {
+        /* handle the trap in U-mode */
+        s = env->mstatus;
+        s = set_field(s, MSTATUS_UPIE, get_field(s, MSTATUS_UIE));
+        s = set_field(s, MSTATUS_UIE, 0);
+        env->mstatus = s;
+        env->ucause = cause | ((target_ulong)async << (TARGET_LONG_BITS - 1));
+        env->uepc = env->pc;
+        env->utval = tval;
+        env->pc = (env->utvec >> 2 << 2) +
+            ((async && (env->utvec & 3) == 1) ? cause * 4 : 0);
+        riscv_cpu_set_mode(env, PRV_U, env->virt_enabled);
+	mode = PRV_U;
+     }
 
     /*
      * Check double trap condition only if already in S-mode and targeting
@@ -2370,7 +2415,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         riscv_cpu_set_mode(env, PRV_S, virt);
 
         src = env->sepc;
-    } else {
+    } else if (mode == PRV_M) { /* If mode == PRV_U we should bypass at here ? */
         /*
          * If the hart encounters an exception while executing in M-mode
          * with the mnstatus.NMIE bit clear, the exception is an RNMI exception.

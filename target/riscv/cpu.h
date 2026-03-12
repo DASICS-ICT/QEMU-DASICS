@@ -37,6 +37,8 @@
 
 typedef struct CPUArchState CPURISCVState;
 
+#include "dasics.h"
+
 #define CPU_RESOLVING_TYPE TYPE_RISCV_CPU
 
 #if defined(TARGET_RISCV32)
@@ -67,6 +69,7 @@ typedef struct CPUArchState CPURISCVState;
 #define RVS RV('S')
 #define RVU RV('U')
 #define RVH RV('H')
+#define RVN RV('N')
 #define RVG RV('G')
 #define RVB RV('B')
 
@@ -269,6 +272,9 @@ struct CPUArchState {
     uint32_t elf_flags;
 #endif
 
+    /* add DASICS states */
+    dasics_table_t dasics_state;
+
     target_ulong priv;
     /* CSRs for execution environment configuration */
     uint64_t menvcfg;
@@ -307,6 +313,7 @@ struct CPUArchState {
      * alias of mie[i] and needs to be maintained separately.
      */
     uint64_t sie;
+    uint64_t sideleg;  /* add for RISCV N extensions */
 
     /*
      * When hideleg[i]=0 and hvien[i]=1, vsie[i] is no more
@@ -317,6 +324,14 @@ struct CPUArchState {
     target_ulong satp;   /* since: priv-1.10.0 */
     target_ulong stval;
     target_ulong medeleg;
+    target_ulong sedeleg; /* add for RISCV N extensions */
+
+    /* also add for RISCV N extensions */
+    target_ulong utvec;
+    target_ulong uepc;
+    target_ulong ucause;
+    target_ulong utval;
+    target_ulong utimecmp;
 
     target_ulong stvec;
     target_ulong sepc;
@@ -339,6 +354,7 @@ struct CPUArchState {
     /* Machine and Supervisor interrupt priorities */
     uint8_t miprio[64];
     uint8_t siprio[64];
+    uint8_t uiprio[64]; /* add for RISCV N extensions */
 
     /* AIA CSRs */
     target_ulong miselect;
@@ -373,6 +389,8 @@ struct CPUArchState {
     /* Upper 64-bits of 128-bit CSRs */
     uint64_t mscratchh;
     uint64_t sscratchh;
+    target_ulong uscratch;
+    uint64_t uscratchh; /* add for RISCV N extensions */
 
     /* Virtual CSRs */
     /*
@@ -492,6 +510,7 @@ struct CPUArchState {
     /* Fields from here on are preserved across CPU reset. */
     QEMUTimer *stimer; /* Internal timer for S-mode interrupt */
     QEMUTimer *vstimer; /* Internal timer for VS-mode interrupt */
+    QEMUTimer *utimer; /* Internal timer for U-mode interrupt */
     bool vstime_irq;
 
     hwaddr kernel_addr;
