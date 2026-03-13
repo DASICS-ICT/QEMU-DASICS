@@ -786,16 +786,18 @@ void helper_dasics_redirect(CPURISCVState *env, target_ulong pc, target_ulong ne
     int dst_activezone = 0;
     if (!src_trusted)
         src_activezone = dasics_in_active_zone(env, pc);
-    if (!dst_trusted)
-        dst_activezone = dasics_in_active_zone(env, newpc);
+    dst_activezone = dasics_in_active_zone(env, newpc);
 
     int allow_lib_to_main = !src_trusted && dst_trusted &&
         (newpc == env->dasics_state.dretpc || newpc == env->dasics_state.dmaincall);
     int allow_activezone_to_lib = src_activezone && !dst_trusted &&
         !dst_activezone && (newpc == env->dasics_state.dretpcactz);
+    int allow_lib_to_main_ext = !src_trusted && dst_trusted && dst_activezone;
 
     int allow_brjp = src_trusted  || allow_lib_to_main ||
-                     dst_activezone || allow_activezone_to_lib;
+                     dst_activezone || allow_activezone_to_lib || allow_lib_to_main_ext;
+
+    trace_riscv_dasics_brjp_check(pc, newpc, src_trusted, dst_trusted, dst_activezone, allow_brjp);
 
     if (!allow_brjp && 
         ((env->priv == PRV_U && !(env->dasics_state.maincfg & MCFG_CUFT)) ||

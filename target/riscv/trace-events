@@ -9,6 +9,7 @@ riscv_csr_write_utvec(uint64_t val, uint64_t mode) "val:0x%"PRIx64", newval:0x%"
 # op_helper.c
 riscv_inst_branch(uint64_t pc, uint64_t target) "pc:0x%"PRIx64" target:0x%"PRIx64
 riscv_inst_dasicscalljr(uint64_t pc, uint64_t target) "pc:0x%"PRIx64" target:0x%"PRIx64
+riscv_dasics_brjp_check(uint64_t pc, uint64_t target, bool src_trusted, bool dst_trusted, bool dst_activezone, bool allow_brjp) "pc:0x%"PRIx64" target:0x%"PRIx64" src_trusted:%d dst_trusted:%d dst_activezone:%d allow_brjp:%d"
 riscv_inst_load(uint64_t pc, uint64_t addr) "pc:0x%"PRIx64" addr:0x%"PRIx64
 riscv_inst_store(uint64_t pc, uint64_t addr) "pc:0x%"PRIx64" addr:0x%"PRIx64
 
