@@ -254,10 +254,6 @@ static bool gen_load_tl(DisasContext *ctx, arg_lb *a, MemOp memop)
 {
     TCGv dest = dest_gpr(ctx, a->rd);
     TCGv addr = get_address(ctx, a->rs1, a->imm);
-    bool sreg_restore_candidate = (a->rs1 == 2) &&
-                                  ((memop & MO_SIZE) == MO_64) &&
-                                  (a->rd == 8 || a->rd == 9 ||
-                                   (a->rd >= 18 && a->rd <= 27));
 
 #ifndef CONFIG_USER_ONLY
     TCGv pc_now = tcg_temp_new();
@@ -266,16 +262,6 @@ static bool gen_load_tl(DisasContext *ctx, arg_lb *a, MemOp memop)
 #endif
 
     tcg_gen_qemu_ld_tl(dest, addr, ctx->mem_idx, memop);
-#ifndef CONFIG_USER_ONLY
-    if (sreg_restore_candidate) {
-        TCGv plain = tcg_temp_new();
-        TCGv_i32 rdno = tcg_constant_i32(a->rd);
-        TCGv_i32 baseno = tcg_constant_i32(a->rs1);
-
-        gen_helper_dasics_sreg_load_gate(plain, cpu_env, pc_now, rdno, baseno, addr, dest);
-        tcg_gen_mov_tl(dest, plain);
-    }
-#endif
     gen_set_gpr(ctx, a->rd, dest);
     return true;
 }
@@ -371,25 +357,12 @@ static bool gen_store_tl(DisasContext *ctx, arg_sb *a, MemOp memop)
 {
     TCGv addr = get_address(ctx, a->rs1, a->imm);
     TCGv data = get_gpr(ctx, a->rs2, EXT_NONE);
-    bool sreg_save_candidate = (a->rs1 == 2) &&
-                               ((memop & MO_SIZE) == MO_64) &&
-                               (a->rs2 == 8 || a->rs2 == 9 ||
-                                (a->rs2 >= 18 && a->rs2 <= 27));
 
 #ifndef CONFIG_USER_ONLY
     TCGv pc_now = tcg_temp_new();
     gen_pc_plus_diff(pc_now, ctx, 0);
     
     gen_helper_dasics_st_check(cpu_env, pc_now, addr);
-
-    if (sreg_save_candidate) {
-        TCGv gated = tcg_temp_new();
-        TCGv_i32 regno = tcg_constant_i32(a->rs2);
-        TCGv_i32 baseno = tcg_constant_i32(a->rs1);
-
-        gen_helper_dasics_sreg_store_gate(gated, cpu_env, pc_now, regno, baseno, addr, data);
-        tcg_gen_mov_tl(data, gated);
-    }
 #endif
 
     tcg_gen_qemu_st_tl(data, addr, ctx->mem_idx, memop);

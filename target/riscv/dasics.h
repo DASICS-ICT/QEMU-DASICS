@@ -38,9 +38,10 @@
 #define MAX_DASICS_LIBJMPBOUNDS 4
 
 #define DASICS_SREG_COUNT         12
+#define M4_PHASE_BITS             1
 #define SREG_PHASE_INIT_LOCKED    0
 #define SREG_PHASE_ACTIVE         1
-#define SREG_PHASE_RESTORED_LOCKED 2
+#define SREG_PHASE_RESTORED_LOCKED 2 /* legacy compatibility value */
 
 typedef struct {
     target_ulong hi;
@@ -49,14 +50,14 @@ typedef struct {
 
 typedef struct {
     uint8_t         phase[DASICS_SREG_COUNT];
+    /* Legacy fields are retained for snapshot compatibility only. */
     uint8_t         saved_once[DASICS_SREG_COUNT];
     target_ulong    saved_addr[DASICS_SREG_COUNT];
-    target_ulong    sp_off[DASICS_SREG_COUNT]; /* record only offset to sp */
+    target_ulong    sp_off[DASICS_SREG_COUNT];
     target_ulong    shadow_cipher[DASICS_SREG_COUNT];
-    /* crypto framework v1 draft state (algorithm-swappable path) */
-    uint8_t         crypto_algo; /* v1 default: A (PRF+MAC) */
-    uint8_t         tag_bits;    /* 64 or 128 */
-    target_ulong    shadow_tag_lo[DASICS_SREG_COUNT];
+    uint8_t         crypto_algo;
+    uint8_t         tag_bits;
+    target_ulong    shadow_tag_lo[DASICS_SREG_COUNT]; /* active MAC tag */
     target_ulong    shadow_tag_hi[DASICS_SREG_COUNT];
 } dasics_sreg_guard_state_t;
 

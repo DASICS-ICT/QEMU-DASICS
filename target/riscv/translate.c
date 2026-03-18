@@ -321,24 +321,47 @@ static void gen_goto_tb(DisasContext *ctx, int n, target_long diff)
 static TCGv get_gpr(DisasContext *ctx, int reg_num, DisasExtend ext)
 {
     TCGv t;
+    bool is_sreg = reg_num == 8 || reg_num == 9 ||
+                   (reg_num >= 18 && reg_num <= 27);
 
     if (reg_num == 0) {
         return ctx->zero;
     }
 
 #ifndef CONFIG_USER_ONLY
-    if (reg_num == 8 || reg_num == 9 || (reg_num >= 18 && reg_num <= 27)) {
-        bool is_sd_source = ctx->cur_insn_len == 4 &&
-                            extract32(ctx->opcode, 0, 7) == 0x23 &&
-                            extract32(ctx->opcode, 12, 3) == 0x3 &&
-                            extract32(ctx->opcode, 15, 5) == 2 &&
-                            extract32(ctx->opcode, 20, 5) == reg_num;
-        if (!is_sd_source) {
-            TCGv pc_now = tcg_temp_new();
-            TCGv_i32 regno = tcg_constant_i32(reg_num);
-            gen_pc_plus_diff(pc_now, ctx, 0);
-            gen_helper_dasics_sreg_access_check(cpu_env, pc_now, regno);
+    if (is_sreg) {
+        TCGv val = tcg_temp_new();
+        TCGv pc_now = tcg_temp_new();
+        TCGv_i32 regno = tcg_constant_i32(reg_num);
+
+        gen_pc_plus_diff(pc_now, ctx, 0);
+        gen_helper_dasics_sreg_read(val, cpu_env, pc_now, regno, cpu_gpr[reg_num]);
+        tcg_gen_mov_tl(cpu_gpr[reg_num], val);
+
+        switch (get_ol(ctx)) {
+        case MXL_RV32:
+            switch (ext) {
+            case EXT_NONE:
+                break;
+            case EXT_SIGN:
+                t = tcg_temp_new();
+                tcg_gen_ext32s_tl(t, val);
+                return t;
+            case EXT_ZERO:
+                t = tcg_temp_new();
+                tcg_gen_ext32u_tl(t, val);
+                return t;
+            default:
+                g_assert_not_reached();
+            }
+            break;
+        case MXL_RV64:
+        case MXL_RV128:
+            break;
+        default:
+            g_assert_not_reached();
         }
+        return val;
     }
 #endif
 
@@ -379,7 +402,10 @@ static TCGv get_gprh(DisasContext *ctx, int reg_num)
 
 static TCGv dest_gpr(DisasContext *ctx, int reg_num)
 {
-    if (reg_num == 0 || get_olen(ctx) < TARGET_LONG_BITS) {
+    bool is_sreg = reg_num == 8 || reg_num == 9 ||
+                   (reg_num >= 18 && reg_num <= 27);
+
+    if (reg_num == 0 || get_olen(ctx) < TARGET_LONG_BITS || is_sreg) {
         return tcg_temp_new();
     }
     return cpu_gpr[reg_num];
@@ -398,17 +424,11 @@ static void gen_set_gpr(DisasContext *ctx, int reg_num, TCGv t)
     if (reg_num != 0) {
 #ifndef CONFIG_USER_ONLY
         if (reg_num == 8 || reg_num == 9 || (reg_num >= 18 && reg_num <= 27)) {
-            bool is_ld_dest = ctx->cur_insn_len == 4 &&
-                              extract32(ctx->opcode, 0, 7) == 0x03 &&
-                              extract32(ctx->opcode, 12, 3) == 0x3 &&
-                              extract32(ctx->opcode, 15, 5) == 2 &&
-                              extract32(ctx->opcode, 7, 5) == reg_num;
-            if (!is_ld_dest) {
-                TCGv pc_now = tcg_temp_new();
-                TCGv_i32 regno = tcg_constant_i32(reg_num);
-                gen_pc_plus_diff(pc_now, ctx, 0);
-                gen_helper_dasics_sreg_access_check(cpu_env, pc_now, regno);
-            }
+            TCGv pc_now = tcg_temp_new();
+            TCGv_i32 regno = tcg_constant_i32(reg_num);
+            gen_pc_plus_diff(pc_now, ctx, 0);
+            gen_helper_dasics_sreg_prepare_write(cpu_env, pc_now, regno,
+                                                 cpu_gpr[reg_num]);
         }
 #endif
 

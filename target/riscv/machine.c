@@ -269,6 +269,41 @@ static int riscv_cpu_post_load(void *opaque, int version_id)
     return 0;
 }
 
+static int dasics_post_load(void *opaque, int version_id)
+{
+    dasics_table_t *state = opaque;
+    int i;
+
+    if (version_id < 6) {
+        for (i = 0; i < DASICS_SREG_COUNT; i++) {
+            if (state->sreg.phase[i] == SREG_PHASE_RESTORED_LOCKED) {
+                state->sreg.phase[i] = SREG_PHASE_INIT_LOCKED;
+                state->sreg.saved_once[i] = 0;
+                state->sreg.saved_addr[i] = 0;
+                state->sreg.sp_off[i] = 0;
+                state->sreg.shadow_cipher[i] = 0;
+                state->sreg.shadow_tag_lo[i] = 0;
+                state->sreg.shadow_tag_hi[i] = 0;
+            }
+        }
+    }
+
+    if (version_id < 7) {
+        for (i = 0; i < DASICS_SREG_COUNT; i++) {
+            /*
+             * Trace-only fields were repurposed in v7 to carry
+             * initial_plain/sealed_token evidence. Older snapshots may
+             * still hold legacy address-oriented values, so clear them
+             * rather than printing misleading trace output after restore.
+             */
+            state->sreg.saved_addr[i] = 0;
+            state->sreg.shadow_cipher[i] = 0;
+        }
+    }
+
+    return 0;
+}
+
 static bool smstateen_needed(void *opaque)
 {
     RISCVCPU *cpu = opaque;
@@ -421,9 +456,10 @@ static const VMStateDescription dasics_boundary = {
 
 static const VMStateDescription dasics_state = {
     .name = "cpu/dasics",
-    .version_id = 5,
+    .version_id = 7,
     .minimum_version_id = 1,
     .needed = dasics_needed,
+    .post_load = dasics_post_load,
     .fields = (VMStateField[]) {
         VMSTATE_SINGLE_TEST(maincfg, dasics_table_t, dasics_maincfg_before_v3,
                             0, vmstate_dasics_maincfg_uint16_from_uint8,
