@@ -121,6 +121,13 @@ DEF_HELPER_2(cbo_clean_flush, void, env, tl)
 DEF_HELPER_2(cbo_inval, void, env, tl)
 DEF_HELPER_2(cbo_zero, void, env, tl)
 
+/* Zimt */
+DEF_HELPER_2(zimt_gentag, tl, env, tl)
+DEF_HELPER_3(zimt_addtag, tl, env, tl, tl)
+DEF_HELPER_3(zimt_settag, void, env, tl, tl)
+DEF_HELPER_3(zimt_checktag, void, env, tl, tl)
+DEF_HELPER_2(zimt_check_ls, void, env, tl)
+
 /* Special functions */
 DEF_HELPER_2(csrr, tl, env, int)
 DEF_HELPER_3(csrw, void, env, int, tl)

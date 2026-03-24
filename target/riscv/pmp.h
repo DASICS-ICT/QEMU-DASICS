@@ -47,6 +47,7 @@ typedef enum {
     MSECCFG_SSEED = 1 << 9,
     MSECCFG_MLPE =  1 << 10,
     MSECCFG_PMM = 3ULL << 32,
+    MSECCFG_MT_MODE = 3ULL << 34,
 } mseccfg_field_t;
 
 typedef struct {

@@ -122,6 +122,7 @@ const RISCVIsaExtData isa_edata_arr[] = {
     ISA_EXT_DATA_ENTRY(zihintpause, PRIV_VERSION_1_10_0, ext_zihintpause),
     ISA_EXT_DATA_ENTRY(zihpm, PRIV_VERSION_1_12_0, ext_zihpm),
     ISA_EXT_DATA_ENTRY(zimop, PRIV_VERSION_1_13_0, ext_zimop),
+    ISA_EXT_DATA_ENTRY(zimt, PRIV_VERSION_1_13_0, ext_zimt),
     ISA_EXT_DATA_ENTRY(zmmul, PRIV_VERSION_1_12_0, ext_zmmul),
     ISA_EXT_DATA_ENTRY(za64rs, PRIV_VERSION_1_12_0, has_priv_1_12),
     ISA_EXT_DATA_ENTRY(zaamo, PRIV_VERSION_1_12_0, ext_zaamo),
@@ -207,6 +208,7 @@ const RISCVIsaExtData isa_edata_arr[] = {
     ISA_EXT_DATA_ENTRY(smmpm, PRIV_VERSION_1_13_0, ext_smmpm),
     ISA_EXT_DATA_ENTRY(smnpm, PRIV_VERSION_1_13_0, ext_smnpm),
     ISA_EXT_DATA_ENTRY(smstateen, PRIV_VERSION_1_12_0, ext_smstateen),
+    ISA_EXT_DATA_ENTRY(smvatag, PRIV_VERSION_1_13_0, ext_smvatag),
     ISA_EXT_DATA_ENTRY(ssaia, PRIV_VERSION_1_12_0, ext_ssaia),
     ISA_EXT_DATA_ENTRY(ssccfg, PRIV_VERSION_1_13_0, ext_ssccfg),
     ISA_EXT_DATA_ENTRY(ssccptr, PRIV_VERSION_1_11_0, has_priv_1_11),
@@ -227,6 +229,7 @@ const RISCVIsaExtData isa_edata_arr[] = {
     ISA_EXT_DATA_ENTRY(smctr, PRIV_VERSION_1_12_0, ext_smctr),
     ISA_EXT_DATA_ENTRY(ssctr, PRIV_VERSION_1_12_0, ext_ssctr),
     ISA_EXT_DATA_ENTRY(svadu, PRIV_VERSION_1_12_0, ext_svadu),
+    ISA_EXT_DATA_ENTRY(svatag, PRIV_VERSION_1_13_0, ext_svatag),
     ISA_EXT_DATA_ENTRY(svinval, PRIV_VERSION_1_12_0, ext_svinval),
     ISA_EXT_DATA_ENTRY(svnapot, PRIV_VERSION_1_12_0, ext_svnapot),
     ISA_EXT_DATA_ENTRY(svpbmt, PRIV_VERSION_1_12_0, ext_svpbmt),
@@ -724,11 +727,16 @@ static void riscv_cpu_reset_hold(Object *obj, ResetType type)
     env->pc = env->resetvec;
     env->bins = 0;
     env->two_stage_lookup = false;
+    env->insn_page_mtag = false;
+    env->in_tag_access = false;
 
     env->menvcfg = (cpu->cfg.ext_svpbmt ? MENVCFG_PBMTE : 0) |
                    (!cpu->cfg.ext_svade && cpu->cfg.ext_svadu ?
-                    MENVCFG_ADUE : 0);
-    env->henvcfg = 0;
+                    MENVCFG_ADUE : 0) |
+                   (cpu->cfg.ext_zimt ? MENVCFG_MT_MODE : 0);
+    env->senvcfg = cpu->cfg.ext_zimt ? SENVCFG_MT_MODE : 0;
+    env->henvcfg = cpu->cfg.ext_zimt ? HENVCFG_MT_MODE : 0;
+    env->hstatus |= cpu->cfg.ext_zimt ? HSTATUS_VUMT_MODE : 0;
 
     /* Initialized default priorities of local interrupts. */
     for (i = 0; i < ARRAY_SIZE(env->miprio); i++) {
@@ -761,6 +769,10 @@ static void riscv_cpu_reset_hold(Object *obj, ResetType type)
     if (riscv_cpu_cfg(env)->ext_smepmp) {
         env->mseccfg = 0;
     }
+    if (cpu->cfg.ext_zimt) {
+        env->mseccfg |= MSECCFG_MT_MODE;
+    }
+    env->zimt_prng_state = 0x9e3779b97f4a7c15ULL ^ (uint64_t)env->mhartid;
 
     pmp_unlock_entries(env);
 #else
@@ -1372,6 +1384,9 @@ const RISCVCPUMultiExtConfig riscv_cpu_vendor_exts[] = {
 
 /* These are experimental so mark with 'x-' */
 const RISCVCPUMultiExtConfig riscv_cpu_experimental_exts[] = {
+    MULTI_EXT_CFG_BOOL("x-zimt", ext_zimt, false),
+    MULTI_EXT_CFG_BOOL("x-svatag", ext_svatag, false),
+    MULTI_EXT_CFG_BOOL("x-smvatag", ext_smvatag, false),
     MULTI_EXT_CFG_BOOL("x-svukte", ext_svukte, false),
 
     { },

@@ -265,6 +265,10 @@ struct CPUArchState {
     target_ulong excp_uw2;
     /* sw check code for sw check exception */
     target_ulong sw_check_code;
+    /* Zimt: whether current insn page has MTAG bit set */
+    bool insn_page_mtag;
+    /* Zimt: in tag metadata access helper path */
+    bool in_tag_access;
 #ifdef CONFIG_USER_ONLY
     uint32_t elf_flags;
 #endif
@@ -315,6 +319,8 @@ struct CPUArchState {
     uint64_t vsie;
 
     target_ulong satp;   /* since: priv-1.10.0 */
+    target_ulong svitts;
+    target_ulong svittu;
     target_ulong stval;
     target_ulong medeleg;
 
@@ -386,6 +392,8 @@ struct CPUArchState {
     target_ulong vscause;
     target_ulong vstval;
     target_ulong vsatp;
+    target_ulong vsvitts;
+    target_ulong vsvittu;
 
     /* AIA VS-mode CSRs */
     target_ulong vsiselect;
@@ -447,6 +455,10 @@ struct CPUArchState {
     /* physical memory protection */
     pmp_table_t pmp_state;
     target_ulong mseccfg;
+    target_ulong mvitt;
+
+    /* Zimt PRNG state for gentag */
+    uint64_t zimt_prng_state;
 
     /* trigger module */
     target_ulong trigger_cur;
@@ -658,6 +670,16 @@ RISCVException smstateen_acc_ok(CPURISCVState *env, int index, uint64_t bit);
 #endif /* !CONFIG_USER_ONLY */
 
 void riscv_cpu_set_mode(CPURISCVState *env, target_ulong newpriv, bool virt_en);
+
+target_ulong riscv_zimt_get_vitt_base(CPURISCVState *env, int mmu_idx);
+target_ulong riscv_zimt_compute_tag_va(CPURISCVState *env, target_ulong va,
+                                       int mmu_idx);
+uint8_t riscv_zimt_get_mc_tag_width(CPURISCVState *env, int mmu_idx);
+bool riscv_zimt_mt_enabled(CPURISCVState *env, int mmu_idx);
+bool riscv_zimt_addr_in_vitt(CPURISCVState *env, target_ulong va, int mmu_idx);
+target_ulong riscv_zimt_tag_load(CPURISCVState *env, target_ulong va, int mmu_idx);
+void riscv_zimt_tag_store(CPURISCVState *env, target_ulong va, target_ulong tag,
+                          int mmu_idx);
 
 void riscv_ctr_add_entry(CPURISCVState *env, target_long src, target_long dst,
     enum CTRType type, target_ulong prev_priv, bool prev_virt);

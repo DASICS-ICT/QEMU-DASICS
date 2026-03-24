@@ -636,6 +636,16 @@ void riscv_cpu_swap_hypervisor_regs(CPURISCVState *env)
 
         env->vsatp = env->satp;
         env->satp = env->satp_hs;
+
+        if (env_archcpu(env)->cfg.ext_svatag) {
+            target_ulong tmp = env->svitts;
+            env->svitts = env->vsvitts;
+            env->vsvitts = tmp;
+
+            tmp = env->svittu;
+            env->svittu = env->vsvittu;
+            env->vsvittu = tmp;
+        }
     } else {
         /* Current V=0 and we are about to change to V=1 */
         env->mstatus_hs = env->mstatus & mstatus_mask;
@@ -659,6 +669,16 @@ void riscv_cpu_swap_hypervisor_regs(CPURISCVState *env)
 
         env->satp_hs = env->satp;
         env->satp = env->vsatp;
+
+        if (env_archcpu(env)->cfg.ext_svatag) {
+            target_ulong tmp = env->svitts;
+            env->svitts = env->vsvitts;
+            env->vsvitts = tmp;
+
+            tmp = env->svittu;
+            env->svittu = env->vsvittu;
+            env->vsvittu = tmp;
+        }
     }
 }
 
@@ -1377,7 +1397,12 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
         if (riscv_cpu_sxl(env) == MXL_RV32) {
             ppn = pte >> PTE_PPN_SHIFT;
         } else {
-            if (pte & PTE_RESERVED(svrsw60t59b)) {
+            target_ulong reserved = PTE_RESERVED(svrsw60t59b);
+
+            if (riscv_cpu_cfg(env)->ext_zimt) {
+                reserved &= ~PTE_MTAG;
+            }
+            if (pte & reserved) {
                 qemu_log_mask(LOG_GUEST_ERROR, "%s: reserved bits set in PTE: "
                               "addr: 0x%" HWADDR_PRIx " pte: 0x" TARGET_FMT_lx "\n",
                               __func__, pte_addr, pte);
@@ -1414,7 +1439,8 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
             goto leaf;
         }
 
-        if (pte & (PTE_D | PTE_A | PTE_U | PTE_ATTR)) {
+        if (pte & (PTE_D | PTE_A | PTE_U | PTE_ATTR |
+                   (riscv_cpu_cfg(env)->ext_zimt ? PTE_MTAG : 0))) {
             /* D, A, and U bits are reserved in non-leaf/inner PTEs */
             qemu_log_mask(LOG_GUEST_ERROR, "%s: D, A, or U bits set in non-leaf PTE: "
                           "addr: 0x%" HWADDR_PRIx " pte: 0x" TARGET_FMT_lx "\n",
@@ -1446,6 +1472,7 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
     }
 
     target_ulong rwx = pte & (PTE_R | PTE_W | PTE_X);
+    bool pte_mtag = !!(pte & PTE_MTAG);
     /* Check for reserved combinations of RWX flags. */
     switch (rwx) {
     case PTE_W | PTE_X:
@@ -1509,6 +1536,10 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
             prot |= PAGE_READ;
         }
         prot |= PAGE_EXEC;
+    }
+
+    if (first_stage && access_type == MMU_INST_FETCH) {
+        env->insn_page_mtag = pte_mtag;
     }
 
     if (pte & PTE_U) {
@@ -1869,6 +1900,15 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     }
 
     if (ret == TRANSLATE_PMP_FAIL) {
+        pmp_violation = true;
+    }
+
+    if (ret == TRANSLATE_SUCCESS &&
+        riscv_cpu_cfg(env)->ext_svatag &&
+        !env->in_tag_access &&
+        (access_type == MMU_DATA_LOAD || access_type == MMU_DATA_STORE) &&
+        riscv_zimt_addr_in_vitt(env, address, mmu_idx)) {
+        ret = TRANSLATE_PMP_FAIL;
         pmp_violation = true;
     }
 
@@ -2290,6 +2330,11 @@ void riscv_cpu_do_interrupt(CPUState *cs)
 
     vsmode_exc = env->virt_enabled && cause < 64 &&
         (((hdeleg >> cause) & 1) || vs_injected);
+
+    if (cpu->cfg.ext_zimt) {
+        env->mstatus = set_field(env->mstatus, MSTATUS_MTAG_I, env->insn_page_mtag);
+        env->hstatus = set_field(env->hstatus, HSTATUS_MTAG_I, env->insn_page_mtag);
+    }
 
     /*
      * Check double trap condition only if already in S-mode and targeting

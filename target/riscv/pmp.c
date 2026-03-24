@@ -655,6 +655,11 @@ void mseccfg_csr_write(CPURISCVState *env, target_ulong val)
         mask |= MSECCFG_PMM;
     }
 
+    if (riscv_cpu_mxl(env) == MXL_RV64 &&
+        (riscv_cpu_cfg(env)->ext_zimt || riscv_cpu_cfg(env)->ext_smvatag)) {
+        mask |= MSECCFG_MT_MODE;
+    }
+
     trace_mseccfg_csr_write(env->mhartid, val);
 
     /* RLB cannot be enabled if it's already 0 and if any regions are locked */

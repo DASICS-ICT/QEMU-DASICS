@@ -365,6 +365,9 @@ static bool gen_load_tl(DisasContext *ctx, arg_lb *a, MemOp memop)
     TCGv dest = dest_gpr(ctx, a->rd);
     TCGv addr = get_address(ctx, a->rs1, a->imm);
 
+    if (ctx->cfg_ptr->ext_zimt && a->rs1 != 2) {
+        gen_helper_zimt_check_ls(tcg_env, addr);
+    }
     tcg_gen_qemu_ld_tl(dest, addr, ctx->mem_idx, memop);
     gen_set_gpr(ctx, a->rd, dest);
     return true;
@@ -379,6 +382,10 @@ static bool gen_load_i128(DisasContext *ctx, arg_lb *a, MemOp memop)
     TCGv addrl = tcg_temp_new();
 
     tcg_gen_addi_tl(addrl, src1l, a->imm);
+
+    if (ctx->cfg_ptr->ext_zimt && a->rs1 != 2) {
+        gen_helper_zimt_check_ls(tcg_env, addrl);
+    }
 
     if ((memop & MO_SIZE) <= MO_64) {
         tcg_gen_qemu_ld_tl(destl, addrl, ctx->mem_idx, memop);
@@ -478,6 +485,9 @@ static bool gen_store_tl(DisasContext *ctx, arg_sb *a, MemOp memop)
         tcg_gen_mb(TCG_MO_ALL | TCG_BAR_STRL);
     }
 
+    if (ctx->cfg_ptr->ext_zimt && a->rs1 != 2) {
+        gen_helper_zimt_check_ls(tcg_env, addr);
+    }
     tcg_gen_qemu_st_tl(data, addr, ctx->mem_idx, memop);
     return true;
 }
@@ -490,6 +500,10 @@ static bool gen_store_i128(DisasContext *ctx, arg_sb *a, MemOp memop)
     TCGv addrl = tcg_temp_new();
 
     tcg_gen_addi_tl(addrl, src1l, a->imm);
+
+    if (ctx->cfg_ptr->ext_zimt && a->rs1 != 2) {
+        gen_helper_zimt_check_ls(tcg_env, addrl);
+    }
 
     if ((memop & MO_SIZE) <= MO_64) {
         tcg_gen_qemu_st_tl(src2l, addrl, ctx->mem_idx, memop);

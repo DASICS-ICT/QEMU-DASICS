@@ -227,6 +227,8 @@
 /* Supervisor Protection and Translation */
 #define CSR_SPTBR           0x180
 #define CSR_SATP            0x180
+#define CSR_SVITTS          0x181
+#define CSR_SVITTU          0x182
 
 /* Supervisor-Level Window to Indirectly Accessed Registers (AIA) */
 #define CSR_SISELECT        0x150
@@ -298,6 +300,8 @@
 #define CSR_VSTVAL          0x243
 #define CSR_VSIP            0x244
 #define CSR_VSATP           0x280
+#define CSR_VSVITTS         0x281
+#define CSR_VSVITTU         0x282
 
 /* Sstc virtual CSRs */
 #define CSR_VSTIMECMP       0x24D
@@ -367,6 +371,7 @@
 /* Enhanced Physical Memory Protection (ePMP) */
 #define CSR_MSECCFG         0x747
 #define CSR_MSECCFGH        0x757
+#define CSR_MVITT           0x381
 /* Physical Memory Protection */
 #define CSR_PMPCFG0         0x3a0
 #define CSR_PMPCFG1         0x3a1
@@ -631,6 +636,7 @@
 #define MSTATUS_MPELP       0x020000000000 /* zicfilp */
 #define MSTATUS_GVA         0x4000000000ULL
 #define MSTATUS_MPV         0x8000000000ULL
+#define MSTATUS_MTAG_I      0x10000000000ULL
 #define MSTATUS_MDT         0x40000000000ULL /* Smdbltrp extension */
 
 #define MSTATUS64_UXL       0x0000000300000000ULL
@@ -681,6 +687,8 @@ typedef enum {
 #define HSTATUS_HUKTE        0x01000000
 #define HSTATUS_VSXL         0x300000000
 #define HSTATUS_HUPMM        0x3000000000000
+#define HSTATUS_MTAG_I       0x00000400
+#define HSTATUS_VUMT_MODE    0xC000000000000ULL
 
 #define HSTATUS32_WPRI       0xFF8FF87E
 #define HSTATUS64_WPRI       0xFFFFFFFFFF8FF87EULL
@@ -733,6 +741,7 @@ typedef enum {
 #define PTE_A               0x040 /* Accessed */
 #define PTE_D               0x080 /* Dirty */
 #define PTE_SOFT            0x300 /* Reserved for Software */
+#define PTE_MTAG            0x0400000000000000ULL /* Memory Tagging */
 #define PTE_PBMT            0x6000000000000000ULL /* Page-based memory types */
 #define PTE_N               0x8000000000000000ULL /* NAPOT translation */
 #define PTE_RESERVED(svrsw60t59b)    \
@@ -789,6 +798,8 @@ typedef enum RISCVException {
 #define RISCV_EXCP_SW_CHECK_FCFI_TVAL      2
 /* zicfiss defines ss violation results in sw check with tval = 3*/
 #define RISCV_EXCP_SW_CHECK_BCFI_TVAL      3
+/* zimt defines tag mismatch as sw check with tval = 4 */
+#define RISCV_EXCP_SW_CHECK_MTE_TVAL       4
 
 #define RISCV_EXCP_INT_FLAG                0x80000000
 #define RISCV_EXCP_INT_MASK                0x7fffffff
@@ -859,6 +870,7 @@ typedef enum RISCVException {
 #define MENVCFG_CBCFE                      BIT(6)
 #define MENVCFG_CBZE                       BIT(7)
 #define MENVCFG_PMM                        (3ULL << 32)
+#define MENVCFG_MT_MODE                    (3ULL << 34)
 #define MENVCFG_DTE                        (1ULL << 59)
 #define MENVCFG_CDE                        (1ULL << 60)
 #define MENVCFG_ADUE                       (1ULL << 61)
@@ -867,6 +879,7 @@ typedef enum RISCVException {
 
 /* For RV32 */
 #define MENVCFGH_DTE                       BIT(27)
+#define MENVCFGH_MT_MODE                   (3U << 2)
 #define MENVCFGH_ADUE                      BIT(29)
 #define MENVCFGH_PBMTE                     BIT(30)
 #define MENVCFGH_STCE                      BIT(31)
@@ -879,6 +892,7 @@ typedef enum RISCVException {
 #define SENVCFG_CBZE                       MENVCFG_CBZE
 #define SENVCFG_UKTE                       BIT(8)
 #define SENVCFG_PMM                        MENVCFG_PMM
+#define SENVCFG_MT_MODE                    MENVCFG_MT_MODE
 
 #define HENVCFG_FIOM                       MENVCFG_FIOM
 #define HENVCFG_LPE                        MENVCFG_LPE
@@ -887,6 +901,7 @@ typedef enum RISCVException {
 #define HENVCFG_CBCFE                      MENVCFG_CBCFE
 #define HENVCFG_CBZE                       MENVCFG_CBZE
 #define HENVCFG_PMM                        MENVCFG_PMM
+#define HENVCFG_MT_MODE                    MENVCFG_MT_MODE
 #define HENVCFG_DTE                        MENVCFG_DTE
 #define HENVCFG_ADUE                       MENVCFG_ADUE
 #define HENVCFG_PBMTE                      MENVCFG_PBMTE
@@ -894,6 +909,7 @@ typedef enum RISCVException {
 
 /* For RV32 */
 #define HENVCFGH_DTE                        MENVCFGH_DTE
+#define HENVCFGH_MT_MODE                    MENVCFGH_MT_MODE
 #define HENVCFGH_ADUE                       MENVCFGH_ADUE
 #define HENVCFGH_PBMTE                      MENVCFGH_PBMTE
 #define HENVCFGH_STCE                       MENVCFGH_STCE
