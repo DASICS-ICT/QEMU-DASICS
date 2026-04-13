@@ -689,6 +689,7 @@ void mseccfg_csr_write(CPURISCVState *env, target_ulong val)
     }
 
     env->mseccfg = val;
+    riscv_zimt_update_tag_check_active(env);
 }
 
 /*

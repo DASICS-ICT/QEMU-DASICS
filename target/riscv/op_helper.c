@@ -137,11 +137,16 @@ target_ulong helper_zimt_addtag(CPURISCVState *env, target_ulong ptr,
 
 void helper_zimt_settag(CPURISCVState *env, target_ulong ptr, target_ulong count)
 {
+    uintptr_t ra = GETPC();
     int mmu_idx = riscv_env_mmu_index(env, false);
     target_ulong va, tag;
     uint32_t i, chunks = count & 0xf;
 
     if (!riscv_cpu_cfg(env)->ext_zimt || !riscv_zimt_mt_enabled(env, mmu_idx)) {
+        return;
+    }
+
+    if (riscv_zimt_get_vitt_base(env, mmu_idx) == 0) {
         return;
     }
 
@@ -155,19 +160,24 @@ void helper_zimt_settag(CPURISCVState *env, target_ulong ptr, target_ulong count
         target_ulong cur = va + (i << 4);
 
         if (riscv_zimt_addr_in_vitt(env, cur, mmu_idx)) {
-            riscv_raise_exception(env, RISCV_EXCP_STORE_AMO_ACCESS_FAULT, GETPC());
+            riscv_raise_exception(env, RISCV_EXCP_STORE_AMO_ACCESS_FAULT, ra);
         }
-        riscv_zimt_tag_store(env, cur, tag, mmu_idx);
+        riscv_zimt_tag_store(env, cur, tag, mmu_idx, ra);
     }
 }
 
 void helper_zimt_checktag(CPURISCVState *env, target_ulong ptr, target_ulong count)
 {
+    uintptr_t ra = GETPC();
     int mmu_idx = riscv_env_mmu_index(env, false);
     target_ulong va, tag;
     uint32_t i, chunks = count & 0xf;
 
     if (!riscv_cpu_cfg(env)->ext_zimt || !riscv_zimt_mt_enabled(env, mmu_idx)) {
+        return;
+    }
+
+    if (riscv_zimt_get_vitt_base(env, mmu_idx) == 0) {
         return;
     }
 
@@ -179,33 +189,76 @@ void helper_zimt_checktag(CPURISCVState *env, target_ulong ptr, target_ulong cou
 
     for (i = 0; i < chunks; i++) {
         target_ulong cur = va + (i << 4);
-        target_ulong mc_tag = riscv_zimt_tag_load(env, cur, mmu_idx);
+        target_ulong mc_tag = riscv_zimt_tag_load(env, cur, mmu_idx, ra);
 
         if (mc_tag != tag) {
             env->sw_check_code = RISCV_EXCP_SW_CHECK_MTE_TVAL;
-            riscv_raise_exception(env, RISCV_EXCP_SW_CHECK, GETPC());
+            riscv_raise_exception(env, RISCV_EXCP_SW_CHECK, ra);
         }
     }
 }
 
 void helper_zimt_check_ls(CPURISCVState *env, target_ulong ptr)
 {
+    uintptr_t ra = GETPC();
     int mmu_idx = riscv_env_mmu_index(env, false);
     target_ulong va, tag, mc_tag;
 
     if (!riscv_cpu_cfg(env)->ext_zimt || !riscv_zimt_mt_enabled(env, mmu_idx)) {
         return;
     }
+
+    if (riscv_zimt_get_vitt_base(env, mmu_idx) == 0) {
+        return;
+    }
+
+    /* Rule 3: tagcheck-exempt code page → skip */
     if (env->insn_page_mtag) {
         return;
     }
 
-    tag = zimt_ptr_extract_tag(env, ptr, mmu_idx);
     va = ptr & zimt_ptr_addr_mask(env, mmu_idx);
-    mc_tag = riscv_zimt_tag_load(env, va, mmu_idx);
+
+#ifndef CONFIG_USER_ONLY
+    {
+        int priv = mmuidx_priv(mmu_idx);
+
+        /*
+         * In paged mode, only tagged-data pages (PTE MTAG=1, no X) get
+         * checked (Spec Rule 1-2).  In Bare/M-mode all pages are treated
+         * as tagged-data, so skip this gate.
+         */
+        if (priv != PRV_M && riscv_cpu_cfg(env)->mmu &&
+            get_field(env->satp, SATP64_MODE) != VM_1_10_MBARE) {
+            void *phost;
+            CPUTLBEntryFull *pfull;
+            int flags;
+
+            flags = probe_access_full(env, va, 1, MMU_DATA_LOAD,
+                                      mmu_idx, true, &phost, &pfull, ra);
+            if (flags & TLB_INVALID_MASK) {
+                return;
+            }
+
+            /* Rule 1: non-tagged-data page → never check */
+            if (!(pfull->prot & RISCV_PROT_PTE_MTAG) ||
+                (pfull->prot & PAGE_EXEC)) {
+                return;
+            }
+
+            /* S-mode accessing U-mode page → no checked access */
+            if (priv == PRV_S && (pfull->prot & RISCV_PROT_PTE_USER)) {
+                return;
+            }
+        }
+    }
+#endif
+
+    tag = zimt_ptr_extract_tag(env, ptr, mmu_idx);
+    mc_tag = riscv_zimt_tag_load(env, va, mmu_idx, ra);
     if (mc_tag != tag) {
         env->sw_check_code = RISCV_EXCP_SW_CHECK_MTE_TVAL;
-        riscv_raise_exception(env, RISCV_EXCP_SW_CHECK, GETPC());
+        riscv_raise_exception(env, RISCV_EXCP_SW_CHECK, ra);
     }
 }
 

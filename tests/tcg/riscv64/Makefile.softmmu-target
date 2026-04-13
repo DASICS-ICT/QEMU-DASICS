@@ -36,5 +36,15 @@ run-plugin-interruptedmemory: interruptedmemory
 	  $(QEMU) -plugin ../plugins/libdiscons.so -d plugin -D $<.pout \
 	  $(QEMU_OPTS)$<)
 
+EXTRA_RUNS += run-test-zimt-basic
+run-test-zimt-basic: test-zimt-basic
+	$(call run-test, $<, \
+	  $(QEMU) $(QEMU_OPTS)$< -cpu rv64,zimop=on,supm=on,x-zimt=on)
+
+EXTRA_RUNS += run-test-zimt-width
+run-test-zimt-width: test-zimt-width
+	$(call run-test, $<, \
+	  $(QEMU) $(QEMU_OPTS)$< -cpu rv64,zimop=on,supm=on,x-zimt=on)
+
 # We don't currently support the multiarch system tests
 undefine MULTIARCH_TESTS

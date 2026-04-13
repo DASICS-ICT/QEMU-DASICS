@@ -1246,6 +1246,9 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
     if (mode == PRV_M || !riscv_cpu_cfg(env)->mmu) {
         *physical = addr;
         *ret_prot = PAGE_READ | PAGE_WRITE | PAGE_EXEC;
+        if (first_stage && access_type == MMU_INST_FETCH) {
+            env->insn_page_mtag = false;
+        }
         return TRANSLATE_SUCCESS;
     }
 
@@ -1296,6 +1299,9 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
     case VM_1_10_MBARE:
         *physical = addr;
         *ret_prot = PAGE_READ | PAGE_WRITE | PAGE_EXEC;
+        if (first_stage && access_type == MMU_INST_FETCH) {
+            env->insn_page_mtag = false;
+        }
         return TRANSLATE_SUCCESS;
     default:
       g_assert_not_reached();
@@ -1640,6 +1646,16 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
     if (access_type != MMU_DATA_STORE && !(pte & PTE_D)) {
         prot &= ~PAGE_WRITE;
     }
+
+    if (riscv_cpu_cfg(env)->ext_zimt && first_stage) {
+        if (pte_mtag) {
+            prot |= RISCV_PROT_PTE_MTAG;
+        }
+        if (pte & PTE_U) {
+            prot |= RISCV_PROT_PTE_USER;
+        }
+    }
+
     *ret_prot = prot;
 
     return TRANSLATE_SUCCESS;
@@ -1798,6 +1814,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     vaddr im_address;
     hwaddr pa = 0;
     int prot, prot2, prot_pmp;
+    int riscv_prot = 0;
     bool pmp_violation = false;
     bool first_stage_error = true;
     bool two_stage_lookup = mmuidx_2stage(mmu_idx);
@@ -1818,6 +1835,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
         ret = get_physical_address(env, &pa, &prot, address,
                                    &env->guest_phys_fault_addr, access_type,
                                    mmu_idx, true, true, false, probe);
+        riscv_prot = prot & (RISCV_PROT_PTE_MTAG | RISCV_PROT_PTE_USER);
 
         /*
          * A G-stage exception may be triggered during two state lookup.
@@ -1879,6 +1897,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
         ret = get_physical_address(env, &pa, &prot, address, NULL,
                                    access_type, mmu_idx, true, false, false,
                                    probe);
+        riscv_prot = prot & (RISCV_PROT_PTE_MTAG | RISCV_PROT_PTE_USER);
 
         qemu_log_mask(CPU_LOG_MMU,
                       "%s address=%" VADDR_PRIx " ret %d physical "
@@ -1906,6 +1925,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     if (ret == TRANSLATE_SUCCESS &&
         riscv_cpu_cfg(env)->ext_svatag &&
         !env->in_tag_access &&
+        riscv_zimt_get_vitt_base(env, mmu_idx) != 0 &&
         (access_type == MMU_DATA_LOAD || access_type == MMU_DATA_STORE) &&
         riscv_zimt_addr_in_vitt(env, address, mmu_idx)) {
         ret = TRANSLATE_PMP_FAIL;
@@ -1913,6 +1933,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     }
 
     if (ret == TRANSLATE_SUCCESS) {
+        prot |= riscv_prot;
         tlb_set_page(cs, address & ~(tlb_size - 1), pa & ~(tlb_size - 1),
                      prot, mmu_idx, tlb_size);
         return true;
@@ -2330,6 +2351,13 @@ void riscv_cpu_do_interrupt(CPUState *cs)
 
     vsmode_exc = env->virt_enabled && cause < 64 &&
         (((hdeleg >> cause) & 1) || vs_injected);
+
+    /*
+     * Zimt tag metadata accesses set this flag before memory operations.
+     * If an exception longjmps out of the helper, clear it here so VITT
+     * protections are not spuriously bypassed on subsequent accesses.
+     */
+    env->in_tag_access = false;
 
     if (cpu->cfg.ext_zimt) {
         env->mstatus = set_field(env->mstatus, MSTATUS_MTAG_I, env->insn_page_mtag);

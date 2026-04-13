@@ -732,11 +732,10 @@ static void riscv_cpu_reset_hold(Object *obj, ResetType type)
 
     env->menvcfg = (cpu->cfg.ext_svpbmt ? MENVCFG_PBMTE : 0) |
                    (!cpu->cfg.ext_svade && cpu->cfg.ext_svadu ?
-                    MENVCFG_ADUE : 0) |
-                   (cpu->cfg.ext_zimt ? MENVCFG_MT_MODE : 0);
-    env->senvcfg = cpu->cfg.ext_zimt ? SENVCFG_MT_MODE : 0;
-    env->henvcfg = cpu->cfg.ext_zimt ? HENVCFG_MT_MODE : 0;
-    env->hstatus |= cpu->cfg.ext_zimt ? HSTATUS_VUMT_MODE : 0;
+                    MENVCFG_ADUE : 0);
+    env->senvcfg = 0;
+    env->henvcfg = 0;
+    riscv_zimt_update_tag_check_active(env);
 
     /* Initialized default priorities of local interrupts. */
     for (i = 0; i < ARRAY_SIZE(env->miprio); i++) {
@@ -768,9 +767,6 @@ static void riscv_cpu_reset_hold(Object *obj, ResetType type)
      */
     if (riscv_cpu_cfg(env)->ext_smepmp) {
         env->mseccfg = 0;
-    }
-    if (cpu->cfg.ext_zimt) {
-        env->mseccfg |= MSECCFG_MT_MODE;
     }
     env->zimt_prng_state = 0x9e3779b97f4a7c15ULL ^ (uint64_t)env->mhartid;
 
@@ -3256,6 +3252,39 @@ static const TypeInfo riscv_cpu_type_infos[] = {
         .cfg.ext_zksed = true,
         .cfg.ext_zksh = true,
         .cfg.ext_svinval = true,
+
+        .cfg.mmu = true,
+        .cfg.pmp = true,
+
+        .cfg.max_satp_mode = VM_1_10_SV39,
+    ),
+
+    DEFINE_RISCV_CPU(TYPE_RISCV_CPU_XIANGSHAN_NHMTE, TYPE_RISCV_VENDOR_CPU,
+        .misa_mxl_max = MXL_RV64,
+        .misa_ext = RVG | RVC | RVB | RVS | RVU,
+        .priv_spec = PRIV_VERSION_1_13_0,
+
+        /* ISA extensions */
+        .cfg.ext_zbc = true,
+        .cfg.ext_zbkb = true,
+        .cfg.ext_zbkc = true,
+        .cfg.ext_zbkx = true,
+        .cfg.ext_zknd = true,
+        .cfg.ext_zkne = true,
+        .cfg.ext_zknh = true,
+        .cfg.ext_zksed = true,
+        .cfg.ext_zksh = true,
+        .cfg.ext_svinval = true,
+
+    	.cfg.ext_ssnpm = true,
+    	.cfg.ext_smnpm = true,
+    	.cfg.ext_smmpm = true,
+
+	.cfg.ext_svukte = true,
+	.cfg.ext_svatag = true,
+	.cfg.ext_smvatag = true, 
+	.cfg.ext_zimop = true,
+	.cfg.ext_zimt = true,
 
         .cfg.mmu = true,
         .cfg.pmp = true,

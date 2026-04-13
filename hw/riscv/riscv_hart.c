@@ -62,7 +62,7 @@ static void riscv_harts_cpu_reset(void *opaque)
 }
 
 #ifndef CONFIG_USER_ONLY
-static void csr_call(char *cmd, uint64_t cpu_num, int csrno, uint64_t *val)
+static int csr_call(char *cmd, uint64_t cpu_num, int csrno, uint64_t *val)
 {
     RISCVCPU *cpu = RISCV_CPU(cpu_by_arch_id(cpu_num));
     CPURISCVState *env = &cpu->env;
@@ -75,7 +75,7 @@ static void csr_call(char *cmd, uint64_t cpu_num, int csrno, uint64_t *val)
                           MAKE_64BIT_MASK(0, TARGET_LONG_BITS), 0);
     }
 
-    g_assert(ret == RISCV_EXCP_NONE);
+    return ret;
 }
 
 static bool csr_qtest_callback(CharFrontend *chr, gchar **words)
@@ -84,7 +84,7 @@ static bool csr_qtest_callback(CharFrontend *chr, gchar **words)
 
         uint64_t cpu;
         uint64_t val;
-        int rc, csr;
+        int rc, csr, ret;
 
         rc = qemu_strtou64(words[2], NULL, 0, &cpu);
         g_assert(rc == 0);
@@ -92,9 +92,10 @@ static bool csr_qtest_callback(CharFrontend *chr, gchar **words)
         g_assert(rc == 0);
         rc = qemu_strtou64(words[4], NULL, 0, &val);
         g_assert(rc == 0);
-        csr_call(words[1], cpu, csr, &val);
+        ret = csr_call(words[1], cpu, csr, &val);
 
-        qtest_sendf(chr, "OK 0 %"PRIx64"\n", val);
+        qtest_sendf(chr, "OK %x %"PRIx64"\n",
+                    (ret == RISCV_EXCP_NONE) ? 0 : ret, val);
 
         return true;
     }

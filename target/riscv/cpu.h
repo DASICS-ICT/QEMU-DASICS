@@ -269,6 +269,8 @@ struct CPUArchState {
     bool insn_page_mtag;
     /* Zimt: in tag metadata access helper path */
     bool in_tag_access;
+    /* Zimt: true when any MT_MODE field is >= 2 (fast path for load/store) */
+    bool zimt_tag_check_active;
 #ifdef CONFIG_USER_ONLY
     uint32_t elf_flags;
 #endif
@@ -322,6 +324,7 @@ struct CPUArchState {
     target_ulong svitts;
     target_ulong svittu;
     target_ulong stval;
+    target_ulong stval_mask;
     target_ulong medeleg;
 
     target_ulong stvec;
@@ -677,9 +680,11 @@ target_ulong riscv_zimt_compute_tag_va(CPURISCVState *env, target_ulong va,
 uint8_t riscv_zimt_get_mc_tag_width(CPURISCVState *env, int mmu_idx);
 bool riscv_zimt_mt_enabled(CPURISCVState *env, int mmu_idx);
 bool riscv_zimt_addr_in_vitt(CPURISCVState *env, target_ulong va, int mmu_idx);
-target_ulong riscv_zimt_tag_load(CPURISCVState *env, target_ulong va, int mmu_idx);
+target_ulong riscv_zimt_tag_load(CPURISCVState *env, target_ulong va, int mmu_idx,
+                                 uintptr_t retaddr);
 void riscv_zimt_tag_store(CPURISCVState *env, target_ulong va, target_ulong tag,
-                          int mmu_idx);
+                          int mmu_idx, uintptr_t retaddr);
+void riscv_zimt_update_tag_check_active(CPURISCVState *env);
 
 void riscv_ctr_add_entry(CPURISCVState *env, target_long src, target_long dst,
     enum CTRType type, target_ulong prev_priv, bool prev_virt);

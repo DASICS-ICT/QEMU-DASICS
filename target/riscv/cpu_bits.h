@@ -229,6 +229,7 @@
 #define CSR_SATP            0x180
 #define CSR_SVITTS          0x181
 #define CSR_SVITTU          0x182
+#define CSR_STVAL_MASK      0x5c0
 
 /* Supervisor-Level Window to Indirectly Accessed Registers (AIA) */
 #define CSR_SISELECT        0x150
@@ -742,6 +743,15 @@ typedef enum {
 #define PTE_D               0x080 /* Dirty */
 #define PTE_SOFT            0x300 /* Reserved for Software */
 #define PTE_MTAG            0x0400000000000000ULL /* Memory Tagging */
+
+/*
+ * RISC-V target-specific bits stored in CPUTLBEntryFull.prot (uint8_t).
+ * Bits 6-7 are unused by generic QEMU TLB infrastructure and safe to use.
+ * Set during get_physical_address() for first-stage leaf PTEs when ext_zimt
+ * is enabled, then read by helper_zimt_check_ls() via probe_access_full().
+ */
+#define RISCV_PROT_PTE_MTAG   0x40  /* leaf PTE has MTAG bit set */
+#define RISCV_PROT_PTE_USER   0x80  /* leaf PTE has U bit set */
 #define PTE_PBMT            0x6000000000000000ULL /* Page-based memory types */
 #define PTE_N               0x8000000000000000ULL /* NAPOT translation */
 #define PTE_RESERVED(svrsw60t59b)    \

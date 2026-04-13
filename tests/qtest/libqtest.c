@@ -1334,7 +1334,7 @@ uint64_t qtest_rtas_call(QTestState *s, const char *name,
     return 0;
 }
 
-static void qtest_rsp_csr(QTestState *s, uint64_t *val)
+static uint64_t qtest_rsp_csr(QTestState *s, uint64_t *val)
 {
     gchar **args;
     uint64_t ret;
@@ -1348,6 +1348,7 @@ static void qtest_rsp_csr(QTestState *s, uint64_t *val)
     g_assert(rc == 0);
 
     g_strfreev(args);
+    return ret;
 }
 
 uint64_t qtest_csr_call(QTestState *s, const char *name,
@@ -1357,8 +1358,7 @@ uint64_t qtest_csr_call(QTestState *s, const char *name,
     qtest_sendf(s, "csr %s 0x%"PRIx64" %d 0x%"PRIx64"\n",
                     name, cpu, csr, *val);
 
-    qtest_rsp_csr(s, val);
-    return 0;
+    return qtest_rsp_csr(s, val);
 }
 
 void qtest_add_func(const char *str, void (*fn)(void))

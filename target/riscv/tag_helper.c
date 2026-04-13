@@ -5,7 +5,9 @@
 #include "qemu/osdep.h"
 #include "cpu.h"
 #include "internals.h"
+#include "pmp.h"
 #include "accel/tcg/cpu-ldst.h"
+#include "exec/tb-flush.h"
 
 #ifdef CONFIG_USER_ONLY
 
@@ -30,14 +32,17 @@ bool riscv_zimt_mt_enabled(CPURISCVState *env, int mmu_idx)
     return false;
 }
 
-target_ulong riscv_zimt_tag_load(CPURISCVState *env, target_ulong va, int mmu_idx)
+target_ulong riscv_zimt_tag_load(CPURISCVState *env, target_ulong va, int mmu_idx,
+                                 uintptr_t retaddr)
 {
+    (void)retaddr;
     return 0;
 }
 
 void riscv_zimt_tag_store(CPURISCVState *env, target_ulong va, target_ulong tag,
-                          int mmu_idx)
+                          int mmu_idx, uintptr_t retaddr)
 {
+    (void)retaddr;
 }
 
 bool riscv_zimt_addr_in_vitt(CPURISCVState *env, target_ulong va, int mmu_idx)
@@ -128,14 +133,15 @@ target_ulong riscv_zimt_compute_tag_va(CPURISCVState *env, target_ulong va,
     return base;
 }
 
-target_ulong riscv_zimt_tag_load(CPURISCVState *env, target_ulong va, int mmu_idx)
+target_ulong riscv_zimt_tag_load(CPURISCVState *env, target_ulong va, int mmu_idx,
+                                 uintptr_t retaddr)
 {
     uint8_t width = riscv_zimt_get_mc_tag_width(env, mmu_idx);
     target_ulong tag_va = riscv_zimt_compute_tag_va(env, va, mmu_idx);
     uint8_t byte;
 
     env->in_tag_access = true;
-    byte = cpu_ldub_mmuidx_ra(env, tag_va, mmu_idx, 0);
+    byte = cpu_ldub_mmuidx_ra(env, tag_va, mmu_idx, retaddr);
     env->in_tag_access = false;
 
     if (width == 8) {
@@ -148,29 +154,34 @@ target_ulong riscv_zimt_tag_load(CPURISCVState *env, target_ulong va, int mmu_id
 }
 
 void riscv_zimt_tag_store(CPURISCVState *env, target_ulong va, target_ulong tag,
-                          int mmu_idx)
+                          int mmu_idx, uintptr_t retaddr)
 {
     uint8_t width = riscv_zimt_get_mc_tag_width(env, mmu_idx);
     target_ulong tag_va = riscv_zimt_compute_tag_va(env, va, mmu_idx);
 
     env->in_tag_access = true;
     if (width == 8) {
-        cpu_stb_mmuidx_ra(env, tag_va, tag & 0xff, mmu_idx, 0);
+        cpu_stb_mmuidx_ra(env, tag_va, tag & 0xff, mmu_idx, retaddr);
     } else if (width == 4) {
-        uint8_t byte = cpu_ldub_mmuidx_ra(env, tag_va, mmu_idx, 0);
+        uint8_t byte = cpu_ldub_mmuidx_ra(env, tag_va, mmu_idx, retaddr);
         uint8_t nib = tag & 0xf;
         if ((va >> 4) & 1) {
             byte = (byte & 0x0f) | (nib << 4);
         } else {
             byte = (byte & 0xf0) | nib;
         }
-        cpu_stb_mmuidx_ra(env, tag_va, byte, mmu_idx, 0);
+        cpu_stb_mmuidx_ra(env, tag_va, byte, mmu_idx, retaddr);
     }
     env->in_tag_access = false;
 }
 
 bool riscv_zimt_addr_in_vitt(CPURISCVState *env, target_ulong va, int mmu_idx)
 {
+    target_ulong base = riscv_zimt_get_vitt_base(env, mmu_idx);
+    if (base == 0) {
+        return false;
+    }
+
     /*
      * Conservative approximation: derive a full-space tag mapping interval.
      * This protects against direct accesses to the virtual tag table while
@@ -186,3 +197,27 @@ bool riscv_zimt_addr_in_vitt(CPURISCVState *env, target_ulong va, int mmu_idx)
 }
 
 #endif
+
+void riscv_zimt_update_tag_check_active(CPURISCVState *env)
+{
+#ifndef CONFIG_USER_ONLY
+    bool old = env->zimt_tag_check_active;
+    bool new_active = false;
+
+    uint64_t menvcfg_mt = get_field(env->menvcfg, MENVCFG_MT_MODE);
+    uint64_t senvcfg_mt = get_field(env->senvcfg, SENVCFG_MT_MODE);
+    uint64_t mseccfg_mt = get_field(env->mseccfg, MSECCFG_MT_MODE);
+
+    if (menvcfg_mt >= 2 || senvcfg_mt >= 2 || mseccfg_mt >= 2) {
+        new_active = true;
+    }
+
+    env->zimt_tag_check_active = new_active;
+
+    if (old != new_active) {
+        queue_tb_flush(env_cpu(env));
+    }
+#else
+    env->zimt_tag_check_active = false;
+#endif
+}

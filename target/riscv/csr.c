@@ -771,6 +771,9 @@ static RISCVException have_mseccfg(CPURISCVState *env, int csrno)
     if (riscv_cpu_cfg(env)->ext_smmpm) {
         return RISCV_EXCP_NONE;
     }
+    if (riscv_cpu_cfg(env)->ext_zimt || riscv_cpu_cfg(env)->ext_smvatag) {
+        return RISCV_EXCP_NONE;
+    }
 
     return RISCV_EXCP_ILLEGAL_INST;
 }
@@ -3247,6 +3250,7 @@ static RISCVException write_menvcfg(CPURISCVState *env, int csrno,
         }
     }
     env->menvcfg = (env->menvcfg & ~mask) | (val & mask);
+    riscv_zimt_update_tag_check_active(env);
 
     if (stce_changed) {
         riscv_timer_stce_changed(env, true, !!(val & MENVCFG_STCE));
@@ -3349,6 +3353,7 @@ static RISCVException write_senvcfg(CPURISCVState *env, int csrno,
     }
 
     env->senvcfg = (env->senvcfg & ~mask) | (val & mask);
+    riscv_zimt_update_tag_check_active(env);
     return RISCV_EXCP_NONE;
 }
 
@@ -3417,6 +3422,7 @@ static RISCVException write_henvcfg(CPURISCVState *env, int csrno,
     }
 
     env->henvcfg = val & mask;
+    riscv_zimt_update_tag_check_active(env);
     if ((env->henvcfg & HENVCFG_DTE) == 0) {
         env->vsstatus &= ~MSTATUS_SDT;
     }
@@ -4250,6 +4256,32 @@ static RISCVException write_stval(CPURISCVState *env, int csrno,
                                   target_ulong val, uintptr_t ra)
 {
     env->stval = val;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException zimt_stval_mask(CPURISCVState *env, int csrno)
+{
+    if (!riscv_cpu_cfg(env)->ext_zimt) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+    if (env->priv < PRV_S ||
+        (riscv_has_ext(env, RVH) && env->virt_enabled)) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_stval_mask(CPURISCVState *env, int csrno,
+                                      target_ulong *val)
+{
+    *val = env->stval_mask;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_stval_mask(CPURISCVState *env, int csrno,
+                                       target_ulong val, uintptr_t ra)
+{
+    env->stval_mask = val;
     return RISCV_EXCP_NONE;
 }
 
@@ -6152,6 +6184,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_SEPC]     = { "sepc",     smode, read_sepc,     write_sepc     },
     [CSR_SCAUSE]   = { "scause",   smode, read_scause,   write_scause   },
     [CSR_STVAL]    = { "stval",    smode, read_stval,    write_stval    },
+    [CSR_STVAL_MASK] = { "stval_mask", zimt_stval_mask, read_stval_mask,
+                         write_stval_mask },
     [CSR_SIP]      = { "sip",      smode, NULL,    NULL, rmw_sip        },
     [CSR_STIMECMP] = { "stimecmp", sstc, read_stimecmp, write_stimecmp,
                        .min_priv_ver = PRIV_VERSION_1_12_0 },
