@@ -183,17 +183,37 @@ bool riscv_zimt_addr_in_vitt(CPURISCVState *env, target_ulong va, int mmu_idx)
     }
 
     /*
-     * Conservative approximation: derive a full-space tag mapping interval.
-     * This protects against direct accesses to the virtual tag table while
-     * avoiding a page-table-mode-dependent helper dependency.
+     * Derive the VITT protection range from the current page table mode.
+     * The VITT covers tag VAs for the user-accessible virtual address space
+     * [0, 2^(va_bits-1)), so the protected interval is
+     *   [vitt_base, vitt_base + (max_user_va >> shift)].
      */
-    target_ulong start = riscv_zimt_compute_tag_va(env, 0, mmu_idx);
-    target_ulong end = riscv_zimt_compute_tag_va(env, (target_ulong)-1, mmu_idx);
+    int vm, va_bits, shift;
+    uint8_t width = riscv_zimt_get_mc_tag_width(env, mmu_idx);
 
-    if (start <= end) {
-        return va >= start && va <= end;
+    shift = (width == 8) ? 4 : 5;
+
+    if (riscv_cpu_mxl(env) == MXL_RV32) {
+        vm = get_field(env->satp, SATP32_MODE);
+        switch (vm) {
+        case VM_1_10_SV32:  va_bits = 32; break;
+        default:            va_bits = 32; break;
+        }
+    } else {
+        vm = get_field(env->satp, SATP64_MODE);
+        switch (vm) {
+        case VM_1_10_SV39:  va_bits = 39; break;
+        case VM_1_10_SV48:  va_bits = 48; break;
+        case VM_1_10_SV57:  va_bits = 57; break;
+        default:            return false;
+        }
     }
-    return va >= end && va <= start;
+
+    target_ulong max_user_va = (1ULL << (va_bits - 1)) - 1;
+    target_ulong start = base;
+    target_ulong end = base + (max_user_va >> shift);
+
+    return va >= start && va <= end;
 }
 
 #endif

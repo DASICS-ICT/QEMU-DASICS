@@ -360,10 +360,18 @@ static bool trans_bgeu(DisasContext *ctx, arg_bgeu *a)
     return gen_branch(ctx, a, TCG_COND_GEU);
 }
 
-static void gen_zimt_check_ls(DisasContext *ctx, TCGv addr)
+/*
+ * ZIMT tag check must receive the raw pointer (rs1 + imm) with tag bits
+ * intact.  get_address() strips tag bits via PMLEN pointer masking, so
+ * we must NOT pass its result here -- the helper needs the original tag
+ * to compare against the memory tag stored in the VITT.
+ */
+static void gen_zimt_check_ls(DisasContext *ctx, int rs1, int imm)
 {
     if (ctx->zimt_active) {
-        gen_helper_zimt_check_ls(tcg_env, addr);
+        TCGv raw_addr = tcg_temp_new();
+        tcg_gen_addi_tl(raw_addr, get_gpr(ctx, rs1, EXT_NONE), imm);
+        gen_helper_zimt_check_ls(tcg_env, raw_addr);
     }
 }
 
@@ -372,7 +380,7 @@ static bool gen_load_tl(DisasContext *ctx, arg_lb *a, MemOp memop)
     TCGv dest = dest_gpr(ctx, a->rd);
     TCGv addr = get_address(ctx, a->rs1, a->imm);
 
-    gen_zimt_check_ls(ctx, addr);
+    gen_zimt_check_ls(ctx, a->rs1, a->imm);
     tcg_gen_qemu_ld_tl(dest, addr, ctx->mem_idx, memop);
     gen_set_gpr(ctx, a->rd, dest);
     return true;
@@ -388,7 +396,7 @@ static bool gen_load_i128(DisasContext *ctx, arg_lb *a, MemOp memop)
 
     tcg_gen_addi_tl(addrl, src1l, a->imm);
 
-    gen_zimt_check_ls(ctx, addrl);
+    gen_zimt_check_ls(ctx, a->rs1, a->imm);
 
     if ((memop & MO_SIZE) <= MO_64) {
         tcg_gen_qemu_ld_tl(destl, addrl, ctx->mem_idx, memop);
@@ -488,7 +496,7 @@ static bool gen_store_tl(DisasContext *ctx, arg_sb *a, MemOp memop)
         tcg_gen_mb(TCG_MO_ALL | TCG_BAR_STRL);
     }
 
-    gen_zimt_check_ls(ctx, addr);
+    gen_zimt_check_ls(ctx, a->rs1, a->imm);
     tcg_gen_qemu_st_tl(data, addr, ctx->mem_idx, memop);
     return true;
 }
@@ -502,7 +510,7 @@ static bool gen_store_i128(DisasContext *ctx, arg_sb *a, MemOp memop)
 
     tcg_gen_addi_tl(addrl, src1l, a->imm);
 
-    gen_zimt_check_ls(ctx, addrl);
+    gen_zimt_check_ls(ctx, a->rs1, a->imm);
 
     if ((memop & MO_SIZE) <= MO_64) {
         tcg_gen_qemu_st_tl(src2l, addrl, ctx->mem_idx, memop);
