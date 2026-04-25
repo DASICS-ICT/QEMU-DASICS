@@ -648,6 +648,16 @@ void riscv_cpu_swap_hypervisor_regs(CPURISCVState *env)
 
         env->vsatp = env->satp;
         env->satp = env->satp_hs;
+
+        if (env_archcpu(env)->cfg.ext_svatag) {
+            target_ulong tmp = env->svitts;
+            env->svitts = env->vsvitts;
+            env->vsvitts = tmp;
+
+            tmp = env->svittu;
+            env->svittu = env->vsvittu;
+            env->vsvittu = tmp;
+        }
     } else {
         /* Current V=0 and we are about to change to V=1 */
         env->mstatus_hs = env->mstatus & mstatus_mask;
@@ -671,6 +681,16 @@ void riscv_cpu_swap_hypervisor_regs(CPURISCVState *env)
 
         env->satp_hs = env->satp;
         env->satp = env->vsatp;
+
+        if (env_archcpu(env)->cfg.ext_svatag) {
+            target_ulong tmp = env->svitts;
+            env->svitts = env->vsvitts;
+            env->vsvitts = tmp;
+
+            tmp = env->svittu;
+            env->svittu = env->vsvittu;
+            env->vsvittu = tmp;
+        }
     }
 }
 
@@ -1238,6 +1258,9 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
     if (mode == PRV_M || !riscv_cpu_cfg(env)->mmu) {
         *physical = addr;
         *ret_prot = PAGE_READ | PAGE_WRITE | PAGE_EXEC;
+        if (first_stage && access_type == MMU_INST_FETCH) {
+            env->insn_page_mtag = false;
+        }
         return TRANSLATE_SUCCESS;
     }
 
@@ -1288,6 +1311,9 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
     case VM_1_10_MBARE:
         *physical = addr;
         *ret_prot = PAGE_READ | PAGE_WRITE | PAGE_EXEC;
+        if (first_stage && access_type == MMU_INST_FETCH) {
+            env->insn_page_mtag = false;
+        }
         return TRANSLATE_SUCCESS;
     default:
       g_assert_not_reached();
@@ -1389,7 +1415,12 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
         if (riscv_cpu_sxl(env) == MXL_RV32) {
             ppn = pte >> PTE_PPN_SHIFT;
         } else {
-            if (pte & PTE_RESERVED(svrsw60t59b)) {
+            target_ulong reserved = PTE_RESERVED(svrsw60t59b);
+
+            if (riscv_cpu_cfg(env)->ext_zimt) {
+                reserved &= ~PTE_MTAG;
+            }
+            if (pte & reserved) {
                 qemu_log_mask(LOG_GUEST_ERROR, "%s: reserved bits set in PTE: "
                               "addr: 0x%" HWADDR_PRIx " pte: 0x" TARGET_FMT_lx "\n",
                               __func__, pte_addr, pte);
@@ -1426,7 +1457,8 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
             goto leaf;
         }
 
-        if (pte & (PTE_D | PTE_A | PTE_U | PTE_ATTR)) {
+        if (pte & (PTE_D | PTE_A | PTE_U | PTE_ATTR |
+                   (riscv_cpu_cfg(env)->ext_zimt ? PTE_MTAG : 0))) {
             /* D, A, and U bits are reserved in non-leaf/inner PTEs */
             qemu_log_mask(LOG_GUEST_ERROR, "%s: D, A, or U bits set in non-leaf PTE: "
                           "addr: 0x%" HWADDR_PRIx " pte: 0x" TARGET_FMT_lx "\n",
@@ -1458,6 +1490,7 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
     }
 
     target_ulong rwx = pte & (PTE_R | PTE_W | PTE_X);
+    bool pte_mtag = !!(pte & PTE_MTAG);
     /* Check for reserved combinations of RWX flags. */
     switch (rwx) {
     case PTE_W | PTE_X:
@@ -1521,6 +1554,10 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
             prot |= PAGE_READ;
         }
         prot |= PAGE_EXEC;
+    }
+
+    if (first_stage && access_type == MMU_INST_FETCH) {
+        env->insn_page_mtag = pte_mtag;
     }
 
     if (pte & PTE_U) {
@@ -1621,6 +1658,16 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
     if (access_type != MMU_DATA_STORE && !(pte & PTE_D)) {
         prot &= ~PAGE_WRITE;
     }
+
+    if (riscv_cpu_cfg(env)->ext_zimt && first_stage) {
+        if (pte_mtag) {
+            prot |= RISCV_PROT_PTE_MTAG;
+        }
+        if (pte & PTE_U) {
+            prot |= RISCV_PROT_PTE_USER;
+        }
+    }
+
     *ret_prot = prot;
 
     return TRANSLATE_SUCCESS;
@@ -1779,6 +1826,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
     vaddr im_address;
     hwaddr pa = 0;
     int prot, prot2, prot_pmp;
+    int riscv_prot = 0;
     bool pmp_violation = false;
     bool first_stage_error = true;
     bool two_stage_lookup = mmuidx_2stage(mmu_idx);
@@ -1799,6 +1847,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
         ret = get_physical_address(env, &pa, &prot, address,
                                    &env->guest_phys_fault_addr, access_type,
                                    mmu_idx, true, true, false, probe);
+        riscv_prot = prot & (RISCV_PROT_PTE_MTAG | RISCV_PROT_PTE_USER);
 
         /*
          * A G-stage exception may be triggered during two state lookup.
@@ -1860,6 +1909,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
         ret = get_physical_address(env, &pa, &prot, address, NULL,
                                    access_type, mmu_idx, true, false, false,
                                    probe);
+        riscv_prot = prot & (RISCV_PROT_PTE_MTAG | RISCV_PROT_PTE_USER);
 
         qemu_log_mask(CPU_LOG_MMU,
                       "%s address=%" VADDR_PRIx " ret %d physical "
@@ -1884,7 +1934,18 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
         pmp_violation = true;
     }
 
+    if (ret == TRANSLATE_SUCCESS &&
+        riscv_cpu_cfg(env)->ext_svatag &&
+        !env->in_tag_access &&
+        riscv_zimt_get_vitt_base(env, mmu_idx) != 0 &&
+        (access_type == MMU_DATA_LOAD || access_type == MMU_DATA_STORE) &&
+        riscv_zimt_addr_in_vitt(env, address, mmu_idx)) {
+        ret = TRANSLATE_PMP_FAIL;
+        pmp_violation = true;
+    }
+
     if (ret == TRANSLATE_SUCCESS) {
+        prot |= riscv_prot;
         tlb_set_page(cs, address & ~(tlb_size - 1), pa & ~(tlb_size - 1),
                      prot, mmu_idx, tlb_size);
         return true;
@@ -2335,6 +2396,18 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         riscv_cpu_set_mode(env, PRV_U, env->virt_enabled);
 	mode = PRV_U;
      }
+
+    /*
+     * Zimt tag metadata accesses set this flag before memory operations.
+     * If an exception longjmps out of the helper, clear it here so VITT
+     * protections are not spuriously bypassed on subsequent accesses.
+     */
+    env->in_tag_access = false;
+
+    if (cpu->cfg.ext_zimt) {
+        env->mstatus = set_field(env->mstatus, MSTATUS_MTAG_I, env->insn_page_mtag);
+        env->hstatus = set_field(env->hstatus, HSTATUS_MTAG_I, env->insn_page_mtag);
+    }
 
     /*
      * Check double trap condition only if already in S-mode and targeting

@@ -752,7 +752,7 @@ static RISCVException pmp(CPURISCVState *env, int csrno)
 {
     if (riscv_cpu_cfg(env)->pmp) {
         int max_pmpcfg = (env->priv_ver >= PRIV_VERSION_1_12_0) ?
-+                              CSR_PMPCFG15 : CSR_PMPCFG3;
+                              CSR_PMPCFG15 : CSR_PMPCFG3;
 
         if (csrno <= max_pmpcfg) {
             uint32_t reg_index = csrno - CSR_PMPCFG0;
@@ -780,8 +780,27 @@ static RISCVException have_mseccfg(CPURISCVState *env, int csrno)
     if (riscv_cpu_cfg(env)->ext_smmpm) {
         return RISCV_EXCP_NONE;
     }
+    if (riscv_cpu_cfg(env)->ext_zimt || riscv_cpu_cfg(env)->ext_smvatag) {
+        return RISCV_EXCP_NONE;
+    }
 
     return RISCV_EXCP_ILLEGAL_INST;
+}
+
+static RISCVException svatag(CPURISCVState *env, int csrno)
+{
+    if (!riscv_cpu_cfg(env)->ext_svatag) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException smvatag(CPURISCVState *env, int csrno)
+{
+    if (!riscv_cpu_cfg(env)->ext_smvatag) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+    return RISCV_EXCP_NONE;
 }
 
 static RISCVException debug(CPURISCVState *env, int csrno)
@@ -2082,6 +2101,10 @@ static RISCVException write_mstatus(CPURISCVState *env, int csrno,
         mask |= (MSTATUS_MPELP | MSTATUS_SPELP);
     }
 
+    if (env_archcpu(env)->cfg.ext_zimt) {
+        mask |= MSTATUS_MTAG_I;
+    }
+
     mstatus = (mstatus & ~mask) | (val & mask);
 
     env->mstatus = mstatus;
@@ -2115,6 +2138,9 @@ static RISCVException write_mstatush(CPURISCVState *env, int csrno,
         if ((valh & MSTATUS_MDT) != 0) {
             mask |= MSTATUS_MIE;
         }
+    }
+    if (riscv_cpu_cfg(env)->ext_zimt) {
+        mask |= MSTATUS_MTAG_I;
     }
     env->mstatus = (env->mstatus & ~mask) | (valh & mask);
 
@@ -3248,6 +3274,10 @@ static RISCVException write_menvcfg(CPURISCVState *env, int csrno,
             mask |= MENVCFG_SSE;
         }
 
+        if (env_archcpu(env)->cfg.ext_zimt) {
+            mask |= MENVCFG_MT_MODE;
+        }
+
         /* Update PMM field only if the value is valid according to Zjpm v1.0 */
         if (env_archcpu(env)->cfg.ext_smnpm &&
             get_field(val, MENVCFG_PMM) != PMM_FIELD_RESERVED) {
@@ -3264,6 +3294,7 @@ static RISCVException write_menvcfg(CPURISCVState *env, int csrno,
         }
     }
     env->menvcfg = (env->menvcfg & ~mask) | (val & mask);
+    riscv_zimt_update_tag_check_active(env);
 
     if (stce_changed) {
         riscv_timer_stce_changed(env, true, !!(val & MENVCFG_STCE));
@@ -3290,6 +3321,10 @@ static RISCVException write_menvcfgh(CPURISCVState *env, int csrno,
                     (cfg->ext_svadu ? MENVCFG_ADUE : 0) |
                     (cfg->ext_smcdeleg ? MENVCFG_CDE : 0) |
                     (cfg->ext_ssdbltrp ? MENVCFG_DTE : 0);
+    if (cfg->ext_zimt) {
+        mask |= MENVCFG_MT_MODE;
+    }
+
     uint64_t valh = (uint64_t)val << 32;
     bool stce_changed = false;
 
@@ -3357,7 +3392,12 @@ static RISCVException write_senvcfg(CPURISCVState *env, int csrno,
         mask |= SENVCFG_UKTE;
     }
 
+    if (env_archcpu(env)->cfg.ext_zimt) {
+        mask |= SENVCFG_MT_MODE;
+    }
+
     env->senvcfg = (env->senvcfg & ~mask) | (val & mask);
+    riscv_zimt_update_tag_check_active(env);
     return RISCV_EXCP_NONE;
 }
 
@@ -3403,6 +3443,10 @@ static RISCVException write_henvcfg(CPURISCVState *env, int csrno,
             mask |= HENVCFG_LPE;
         }
 
+        if (env_archcpu(env)->cfg.ext_zimt) {
+            mask |= HENVCFG_MT_MODE;
+        }
+
         /* H can light up SSE for VS only if HS had it from menvcfg */
         if (env_archcpu(env)->cfg.ext_zicfiss &&
             get_field(env->menvcfg, MENVCFG_SSE)) {
@@ -3422,6 +3466,7 @@ static RISCVException write_henvcfg(CPURISCVState *env, int csrno,
     }
 
     env->henvcfg = val & mask;
+    riscv_zimt_update_tag_check_active(env);
     if ((env->henvcfg & HENVCFG_DTE) == 0) {
         env->vsstatus &= ~MSTATUS_SDT;
     }
@@ -3454,6 +3499,9 @@ static RISCVException write_henvcfgh(CPURISCVState *env, int csrno,
     const RISCVCPUConfig *cfg = riscv_cpu_cfg(env);
     uint64_t mask = env->menvcfg & (HENVCFG_PBMTE | HENVCFG_STCE |
                                     HENVCFG_ADUE | HENVCFG_DTE);
+    if (cfg->ext_zimt) {
+        mask |= HENVCFG_MT_MODE;
+    }
     uint64_t valh = (uint64_t)val << 32;
     RISCVException ret;
     bool stce_changed = false;
@@ -4292,6 +4340,32 @@ static RISCVException write_stval(CPURISCVState *env, int csrno,
     return RISCV_EXCP_NONE;
 }
 
+static RISCVException zimt_stval_mask(CPURISCVState *env, int csrno)
+{
+    if (!riscv_cpu_cfg(env)->ext_zimt) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+    if (env->priv < PRV_S ||
+        (riscv_has_ext(env, RVH) && env->virt_enabled)) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_stval_mask(CPURISCVState *env, int csrno,
+                                      target_ulong *val)
+{
+    *val = env->stval_mask;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_stval_mask(CPURISCVState *env, int csrno,
+                                       target_ulong val, uintptr_t ra)
+{
+    env->stval_mask = val;
+    return RISCV_EXCP_NONE;
+}
+
 static RISCVException rmw_hvip64(CPURISCVState *env, int csrno,
                                  uint64_t *ret_val,
                                  uint64_t new_val, uint64_t wr_mask);
@@ -4557,6 +4631,36 @@ static int rmw_uip(CPURISCVState *env, int csrno, target_ulong *ret_value,
 //     return RISCV_EXCP_NONE;
 // }
 
+static RISCVException read_svitts(CPURISCVState *env, int csrno,
+                                  target_ulong *val)
+{
+    *val = env->svitts;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_svitts(CPURISCVState *env, int csrno,
+                                   target_ulong val, uintptr_t ra)
+{
+    env->svitts = val & ~(target_ulong)0xfff;
+    tlb_flush(env_cpu(env));
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_svittu(CPURISCVState *env, int csrno,
+                                  target_ulong *val)
+{
+    *val = env->svittu;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_svittu(CPURISCVState *env, int csrno,
+                                   target_ulong val, uintptr_t ra)
+{
+    env->svittu = val & ~(target_ulong)0xfff;
+    tlb_flush(env_cpu(env));
+    return RISCV_EXCP_NONE;
+}
+
 static RISCVException rmw_sctrdepth(CPURISCVState *env, int csrno,
                                     target_ulong *ret_val,
                                     target_ulong new_val, target_ulong wr_mask)
@@ -4780,6 +4884,9 @@ static RISCVException write_hstatus(CPURISCVState *env, int csrno,
         riscv_cpu_mxl(env) != MXL_RV64 ||
         get_field(val, HSTATUS_HUPMM) == PMM_FIELD_RESERVED) {
         mask &= ~HSTATUS_HUPMM;
+    }
+    if (!env_archcpu(env)->cfg.ext_zimt) {
+        mask &= ~(HSTATUS_MTAG_I | HSTATUS_VUMT_MODE);
     }
     env->hstatus = (env->hstatus & ~mask) | (val & mask);
 
@@ -5455,6 +5562,48 @@ static RISCVException write_vsatp(CPURISCVState *env, int csrno,
     return RISCV_EXCP_NONE;
 }
 
+static RISCVException read_vsvitts(CPURISCVState *env, int csrno,
+                                   target_ulong *val)
+{
+    if (!riscv_cpu_cfg(env)->ext_svatag) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+    *val = env->vsvitts;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_vsvitts(CPURISCVState *env, int csrno,
+                                    target_ulong val, uintptr_t ra)
+{
+    if (!riscv_cpu_cfg(env)->ext_svatag) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+    env->vsvitts = val & ~(target_ulong)0xfff;
+    tlb_flush(env_cpu(env));
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_vsvittu(CPURISCVState *env, int csrno,
+                                   target_ulong *val)
+{
+    if (!riscv_cpu_cfg(env)->ext_svatag) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+    *val = env->vsvittu;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_vsvittu(CPURISCVState *env, int csrno,
+                                    target_ulong val, uintptr_t ra)
+{
+    if (!riscv_cpu_cfg(env)->ext_svatag) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+    env->vsvittu = val & ~(target_ulong)0xfff;
+    tlb_flush(env_cpu(env));
+    return RISCV_EXCP_NONE;
+}
+
 static RISCVException read_mtval2(CPURISCVState *env, int csrno,
                                   target_ulong *val)
 {
@@ -5495,6 +5644,21 @@ static RISCVException write_mseccfg(CPURISCVState *env, int csrno,
                                     target_ulong val, uintptr_t ra)
 {
     mseccfg_csr_write(env, val);
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_mvitt(CPURISCVState *env, int csrno,
+                                 target_ulong *val)
+{
+    *val = env->mvitt;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_mvitt(CPURISCVState *env, int csrno,
+                                  target_ulong val, uintptr_t ra)
+{
+    env->mvitt = val & ~(target_ulong)0xfff;
+    tlb_flush(env_cpu(env));
     return RISCV_EXCP_NONE;
 }
 
@@ -6556,6 +6720,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_SEPC]     = { "sepc",     smode, read_sepc,     write_sepc     },
     [CSR_SCAUSE]   = { "scause",   smode, read_scause,   write_scause   },
     [CSR_STVAL]    = { "stval",    smode, read_stval,    write_stval    },
+    [CSR_STVAL_MASK] = { "stval_mask", zimt_stval_mask, read_stval_mask,
+                         write_stval_mask },
     [CSR_SIP]      = { "sip",      smode, NULL,    NULL, rmw_sip        },
     [CSR_STIMECMP] = { "stimecmp", sstc, read_stimecmp, write_stimecmp,
                        .min_priv_ver = PRIV_VERSION_1_12_0 },
@@ -6570,6 +6736,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
 
     /* Supervisor Protection and Translation */
     [CSR_SATP]     = { "satp",     satp, read_satp,     write_satp     },
+    [CSR_SVITTS]   = { "svitts",   svatag, read_svitts, write_svitts    },
+    [CSR_SVITTU]   = { "svittu",   svatag, read_svittu, write_svittu    },
 
     /* User Trap Setup */
     [CSR_USTATUS]   = {"ustatus",   uli, read_ustatus,      write_ustatus      },
@@ -6662,6 +6830,10 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
                           .min_priv_ver = PRIV_VERSION_1_12_0                },
     [CSR_VSATP]       = { "vsatp",       hmode,   read_vsatp,    write_vsatp,
                           .min_priv_ver = PRIV_VERSION_1_12_0                },
+    [CSR_VSVITTS]     = { "vsvitts",     hmode,   read_vsvitts,  write_vsvitts,
+                          .min_priv_ver = PRIV_VERSION_1_13_0                },
+    [CSR_VSVITTU]     = { "vsvittu",     hmode,   read_vsvittu,  write_vsvittu,
+                          .min_priv_ver = PRIV_VERSION_1_13_0                },
 
     [CSR_MTVAL2]      = { "mtval2", dbltrp_hmode, read_mtval2, write_mtval2,
                           .min_priv_ver = PRIV_VERSION_1_12_0                },
@@ -6715,6 +6887,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     /* Physical Memory Protection */
     [CSR_MSECCFG]    = { "mseccfg",   have_mseccfg, read_mseccfg, write_mseccfg,
                          .min_priv_ver = PRIV_VERSION_1_11_0           },
+    [CSR_MVITT]      = { "mvitt", smvatag, read_mvitt, write_mvitt,
+                         .min_priv_ver = PRIV_VERSION_1_13_0           },
     [CSR_PMPCFG0]    = { "pmpcfg0",   pmp, read_pmpcfg,  write_pmpcfg  },
     [CSR_PMPCFG1]    = { "pmpcfg1",   pmp, read_pmpcfg,  write_pmpcfg  },
     [CSR_PMPCFG2]    = { "pmpcfg2",   pmp, read_pmpcfg,  write_pmpcfg  },

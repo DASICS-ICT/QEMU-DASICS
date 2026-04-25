@@ -844,6 +844,37 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         return;
     }
 
+    if (cpu->cfg.ext_zimt) {
+        if (mcc->def->misa_mxl_max != MXL_RV64) {
+            error_setg(errp, "zimt requires RV64");
+            return;
+        }
+        if (!cpu->cfg.ext_zimop) {
+            error_setg(errp, "zimt requires zimop extension");
+            return;
+        }
+        if (!(cpu->cfg.ext_supm || cpu->cfg.ext_sspm || cpu->cfg.ext_smmpm)) {
+            error_setg(errp, "zimt requires pointer masking extensions");
+            return;
+        }
+    }
+
+    if (cpu->cfg.ext_svatag) {
+        if (!cpu->cfg.ext_zimt) {
+            error_setg(errp, "svatag requires zimt");
+            return;
+        }
+        if (!cpu->cfg.ext_svukte) {
+            error_setg(errp, "svatag requires svukte");
+            return;
+        }
+    }
+
+    if (cpu->cfg.ext_smvatag && !cpu->cfg.ext_zimt) {
+        error_setg(errp, "smvatag requires zimt");
+        return;
+    }
+
     if ((cpu->cfg.ext_smctr || cpu->cfg.ext_ssctr) &&
         (!riscv_has_ext(env, RVS) || !cpu->cfg.ext_sscsrind)) {
         if (cpu_cfg_ext_is_user_set(CPU_CFG_OFFSET(ext_smctr)) ||

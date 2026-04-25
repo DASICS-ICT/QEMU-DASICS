@@ -304,6 +304,47 @@ static const VMStateDescription vmstate_envcfg = {
     }
 };
 
+static bool vitt_needed(void *opaque)
+{
+    RISCVCPU *cpu = opaque;
+
+    return cpu->cfg.ext_svatag || cpu->cfg.ext_smvatag;
+}
+
+static bool zimt_needed(void *opaque)
+{
+    RISCVCPU *cpu = opaque;
+
+    return cpu->cfg.ext_zimt;
+}
+
+static const VMStateDescription vmstate_zimt = {
+    .name = "cpu/zimt",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .needed = zimt_needed,
+    .fields = (const VMStateField[]) {
+        VMSTATE_UINT64(env.zimt_prng_state, RISCVCPU),
+        VMSTATE_UINTTL(env.stval_mask, RISCVCPU),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
+static const VMStateDescription vmstate_vitt = {
+    .name = "cpu/vitt",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .needed = vitt_needed,
+    .fields = (const VMStateField[]) {
+        VMSTATE_UINTTL(env.mvitt, RISCVCPU),
+        VMSTATE_UINTTL(env.svitts, RISCVCPU),
+        VMSTATE_UINTTL(env.svittu, RISCVCPU),
+        VMSTATE_UINTTL(env.vsvitts, RISCVCPU),
+        VMSTATE_UINTTL(env.vsvittu, RISCVCPU),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
 static bool ctr_needed(void *opaque)
 {
     RISCVCPU *cpu = opaque;
@@ -552,6 +593,8 @@ const VMStateDescription vmstate_riscv_cpu = {
         &vmstate_kvmtimer,
 #endif
         &vmstate_envcfg,
+        &vmstate_zimt,
+        &vmstate_vitt,
         &vmstate_debug,
         &vmstate_smstateen,
         &vmstate_jvt,

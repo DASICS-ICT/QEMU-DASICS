@@ -42,6 +42,226 @@ static inline MemOp mo_endian_env(CPURISCVState *env)
 }
 #endif
 
+static inline uint8_t zimt_ptr_tag_width(CPURISCVState *env, int mmu_idx)
+{
+    uint8_t mem_w = riscv_zimt_get_mc_tag_width(env, mmu_idx);
+
+    if (mem_w == 8) {
+        return 7;
+    }
+    if (mem_w == 4) {
+        return 4;
+    }
+    return 0;
+}
+
+static inline target_ulong zimt_ptr_tag_mask(CPURISCVState *env, int mmu_idx)
+{
+    uint8_t w = zimt_ptr_tag_width(env, mmu_idx);
+    int xlen = riscv_cpu_xlen(env);
+
+    if (w == 0 || w >= xlen) {
+        return 0;
+    }
+    return MAKE_64BIT_MASK(xlen - w, w);
+}
+
+static inline target_ulong zimt_ptr_addr_mask(CPURISCVState *env, int mmu_idx)
+{
+    return ~zimt_ptr_tag_mask(env, mmu_idx);
+}
+
+static inline target_ulong zimt_ptr_extract_tag(CPURISCVState *env,
+                                                target_ulong ptr,
+                                                int mmu_idx)
+{
+    uint8_t w = zimt_ptr_tag_width(env, mmu_idx);
+    int xlen = riscv_cpu_xlen(env);
+
+    if (w == 0) {
+        return 0;
+    }
+    return (ptr >> (xlen - w)) & MAKE_64BIT_MASK(0, w);
+}
+
+static inline target_ulong zimt_ptr_insert_tag(CPURISCVState *env,
+                                               target_ulong ptr,
+                                               target_ulong tag,
+                                               int mmu_idx)
+{
+    uint8_t w = zimt_ptr_tag_width(env, mmu_idx);
+    int xlen = riscv_cpu_xlen(env);
+    target_ulong mask = zimt_ptr_tag_mask(env, mmu_idx);
+
+    if (w == 0) {
+        return ptr;
+    }
+    ptr &= ~mask;
+    ptr |= (tag & MAKE_64BIT_MASK(0, w)) << (xlen - w);
+    return ptr;
+}
+
+target_ulong helper_zimt_gentag(CPURISCVState *env, target_ulong ptr)
+{
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    uint8_t w;
+
+    if (!riscv_cpu_cfg(env)->ext_zimt || !riscv_zimt_mt_enabled(env, mmu_idx)) {
+        return 0;
+    }
+
+    w = zimt_ptr_tag_width(env, mmu_idx);
+    env->zimt_prng_state ^= env->zimt_prng_state << 13;
+    env->zimt_prng_state ^= env->zimt_prng_state >> 7;
+    env->zimt_prng_state ^= env->zimt_prng_state << 17;
+    return zimt_ptr_insert_tag(env, ptr, env->zimt_prng_state &
+                               MAKE_64BIT_MASK(0, w), mmu_idx);
+}
+
+target_ulong helper_zimt_addtag(CPURISCVState *env, target_ulong ptr,
+                                target_ulong imm4)
+{
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    uint8_t w;
+    target_ulong tag;
+
+    if (!riscv_cpu_cfg(env)->ext_zimt || !riscv_zimt_mt_enabled(env, mmu_idx)) {
+        return 0;
+    }
+
+    w = zimt_ptr_tag_width(env, mmu_idx);
+    tag = zimt_ptr_extract_tag(env, ptr, mmu_idx);
+    tag = (tag + (imm4 & 0xf)) & MAKE_64BIT_MASK(0, w);
+    return zimt_ptr_insert_tag(env, ptr, tag, mmu_idx);
+}
+
+void helper_zimt_settag(CPURISCVState *env, target_ulong ptr, target_ulong count)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    target_ulong va, tag;
+    uint32_t i, chunks = count & 0xf;
+
+    if (!riscv_cpu_cfg(env)->ext_zimt || !riscv_zimt_mt_enabled(env, mmu_idx)) {
+        return;
+    }
+
+    if (riscv_zimt_get_vitt_base(env, mmu_idx) == 0) {
+        return;
+    }
+
+    if (chunks == 0) {
+        chunks = 16;
+    }
+    tag = zimt_ptr_extract_tag(env, ptr, mmu_idx);
+    va = ptr & zimt_ptr_addr_mask(env, mmu_idx);
+
+    for (i = 0; i < chunks; i++) {
+        target_ulong cur = va + (i << 4);
+
+        if (riscv_zimt_addr_in_vitt(env, cur, mmu_idx)) {
+            riscv_raise_exception(env, RISCV_EXCP_STORE_AMO_ACCESS_FAULT, ra);
+        }
+        riscv_zimt_tag_store(env, cur, tag, mmu_idx, ra);
+    }
+}
+
+void helper_zimt_checktag(CPURISCVState *env, target_ulong ptr, target_ulong count)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    target_ulong va, tag;
+    uint32_t i, chunks = count & 0xf;
+
+    if (!riscv_cpu_cfg(env)->ext_zimt || !riscv_zimt_mt_enabled(env, mmu_idx)) {
+        return;
+    }
+
+    if (riscv_zimt_get_vitt_base(env, mmu_idx) == 0) {
+        return;
+    }
+
+    if (chunks == 0) {
+        chunks = 16;
+    }
+    tag = zimt_ptr_extract_tag(env, ptr, mmu_idx);
+    va = ptr & zimt_ptr_addr_mask(env, mmu_idx);
+
+    for (i = 0; i < chunks; i++) {
+        target_ulong cur = va + (i << 4);
+        target_ulong mc_tag = riscv_zimt_tag_load(env, cur, mmu_idx, ra);
+
+        if (mc_tag != tag) {
+            env->sw_check_code = RISCV_EXCP_SW_CHECK_MTE_TVAL;
+            riscv_raise_exception(env, RISCV_EXCP_SW_CHECK, ra);
+        }
+    }
+}
+
+void helper_zimt_check_ls(CPURISCVState *env, target_ulong ptr)
+{
+    uintptr_t ra = GETPC();
+    int mmu_idx = riscv_env_mmu_index(env, false);
+    target_ulong va, tag, mc_tag;
+
+    if (!riscv_cpu_cfg(env)->ext_zimt || !riscv_zimt_mt_enabled(env, mmu_idx)) {
+        return;
+    }
+
+    if (riscv_zimt_get_vitt_base(env, mmu_idx) == 0) {
+        return;
+    }
+
+    /* Rule 3: tagcheck-exempt code page → skip */
+    if (env->insn_page_mtag) {
+        return;
+    }
+
+    va = ptr & zimt_ptr_addr_mask(env, mmu_idx);
+
+#ifndef CONFIG_USER_ONLY
+    {
+        int priv = mmuidx_priv(mmu_idx);
+
+        /*
+         * In paged mode, only tagged-data pages (PTE MTAG=1, no X) get
+         * checked (Spec Rule 1-2).  In Bare/M-mode all pages are treated
+         * as tagged-data, so skip this gate.
+         */
+        if (priv != PRV_M && riscv_cpu_cfg(env)->mmu &&
+            get_field(env->satp, SATP64_MODE) != VM_1_10_MBARE) {
+            void *phost;
+            CPUTLBEntryFull *pfull;
+            int flags;
+
+            flags = probe_access_full(env, va, 1, MMU_DATA_LOAD,
+                                      mmu_idx, true, &phost, &pfull, ra);
+            if (flags & TLB_INVALID_MASK) {
+                return;
+            }
+
+            /* Rule 1: non-tagged-data page → never check */
+            if (!(pfull->prot & RISCV_PROT_PTE_MTAG) ||
+                (pfull->prot & PAGE_EXEC)) {
+                return;
+            }
+
+            /* S-mode accessing U-mode page → no checked access */
+            if (priv == PRV_S && (pfull->prot & RISCV_PROT_PTE_USER)) {
+                return;
+            }
+        }
+    }
+#endif
+
+    tag = zimt_ptr_extract_tag(env, ptr, mmu_idx);
+    mc_tag = riscv_zimt_tag_load(env, va, mmu_idx, ra);
+    if (mc_tag != tag) {
+        env->sw_check_code = RISCV_EXCP_SW_CHECK_MTE_TVAL;
+        riscv_raise_exception(env, RISCV_EXCP_SW_CHECK, ra);
+    }
+}
+
 /* Exceptions processing helpers */
 G_NORETURN void riscv_raise_exception(CPURISCVState *env,
                                       RISCVException exception,
