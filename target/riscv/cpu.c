@@ -3268,10 +3268,6 @@ static const TypeInfo riscv_cpu_type_infos[] = {
         .misa_ext = RVG | RVC | RVB | RVS | RVU | RVN,
         .priv_spec = PRIV_VERSION_1_13_0,
 
-	/* TODO: add addtional extensions for memory tagging */
-    	.cfg.ext_zimop = false,
-    	.cfg.ext_zicclsm = false,
-
         /* ISA extensions */
         .cfg.ext_zbc = true,
         .cfg.ext_zbkb = true,
@@ -3283,6 +3279,9 @@ static const TypeInfo riscv_cpu_type_infos[] = {
         .cfg.ext_zksed = true,
         .cfg.ext_zksh = true,
         .cfg.ext_svinval = true,
+
+  	/* extensions for memory tagging */
+	.cfg.ext_zimop = false,
 
 	/* TODO: add addtional extensions for dasics */
 	.cfg.ext_dasics = true,

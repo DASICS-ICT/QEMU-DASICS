@@ -134,7 +134,6 @@ BOOL_FIELD(has_priv_1_11)
 
 /* Always enabled for TCG if has_priv_1_11 */
 BOOL_FIELD(ext_ziccrse)
-BOOL_FIELD(ext_zicclsm)
 BOOL_FIELD(ext_dasics)
 
 /* Vendor-specific custom extensions */
