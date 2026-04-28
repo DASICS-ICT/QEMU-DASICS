@@ -515,16 +515,16 @@
 #define CSR_DLBOUND30       0x8ae
 #define CSR_DLBOUND31       0x8af
 
-#define CSR_DLIBJMPBOUND0   0x8c0
-#define CSR_DLIBJMPBOUND1   0x8c1
-#define CSR_DLIBJMPBOUND2   0x8c2
-#define CSR_DLIBJMPBOUND3   0x8c3
-#define CSR_DLIBJMPBOUND4   0x8c4
-#define CSR_DLIBJMPBOUND5   0x8c5
-#define CSR_DLIBJMPBOUND6   0x8c6
-#define CSR_DLIBJMPBOUND7   0x8c7
+#define CSR_DJBOUND0        0x8c0
+#define CSR_DJBOUND1        0x8c1
+#define CSR_DJBOUND2        0x8c2
+#define CSR_DJBOUND3        0x8c3
+#define CSR_DJBOUND4        0x8c4
+#define CSR_DJBOUND5        0x8c5
+#define CSR_DJBOUND6        0x8c6
+#define CSR_DJBOUND7        0x8c7
 
-#define CSR_DJMPCFG         0x8c8
+#define CSR_DJCFG           0x8c8
 #define CSR_DMAINCALL       0x8b0
 #define CSR_DRETPC          0x8b1
 #define CSR_DRETPCACTZ      0x8b2

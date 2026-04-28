@@ -5,16 +5,16 @@
 int dasics_in_trusted_zone(CPURISCVState *env, target_ulong pc) 
 {
 #ifndef CONFIG_USER_ONLY
-    int is_smain_enable = env->dasics_state.smbound.lo <= env->dasics_state.smbound.hi && \
+    int is_smain_enable = env->dasics_state.smbound.lo < env->dasics_state.smbound.hi && \
                           (env->dasics_state.maincfg & MCFG_SENA);
-    int is_umain_enable = env->dasics_state.umbound.lo <= env->dasics_state.umbound.hi && \
+    int is_umain_enable = env->dasics_state.umbound.lo < env->dasics_state.umbound.hi && \
                           (env->dasics_state.maincfg & MCFG_UENA);
 
-    int in_smain_zone = pc <= env->dasics_state.smbound.hi && \
-                        pc >= env->dasics_state.smbound.lo && \
+    int in_smain_zone = pc >= env->dasics_state.smbound.lo && \
+                        pc < env->dasics_state.smbound.hi && \
                         env->priv == PRV_S && is_smain_enable;
-    int in_umain_zone = pc <= env->dasics_state.umbound.hi && \
-                        pc >= env->dasics_state.umbound.lo && \
+    int in_umain_zone = pc >= env->dasics_state.umbound.lo && \
+                        pc < env->dasics_state.umbound.hi && \
                         env->priv == PRV_U && is_umain_enable;
 
     int in_s_trusted_zone = in_smain_zone || (env->priv == PRV_S && !is_smain_enable);
