@@ -124,9 +124,9 @@ DEF_HELPER_2(cbo_zero, void, env, tl)
 /* Zimt */
 DEF_HELPER_2(zimt_gentag, tl, env, tl)
 DEF_HELPER_3(zimt_addtag, tl, env, tl, tl)
-DEF_HELPER_3(zimt_settag, void, env, tl, tl)
-DEF_HELPER_3(zimt_checktag, void, env, tl, tl)
-DEF_HELPER_2(zimt_check_ls, void, env, tl)
+DEF_HELPER_4(zimt_settag, void, env, tl, tl, tl)
+DEF_HELPER_4(zimt_checktag, void, env, tl, tl, tl)
+DEF_HELPER_3(zimt_check_ls, void, env, tl, tl)
 
 /* Special functions */
 DEF_HELPER_2(csrr, tl, env, int)

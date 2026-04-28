@@ -135,7 +135,8 @@ target_ulong helper_zimt_addtag(CPURISCVState *env, target_ulong ptr,
     return zimt_ptr_insert_tag(env, ptr, tag, mmu_idx);
 }
 
-void helper_zimt_settag(CPURISCVState *env, target_ulong ptr, target_ulong count)
+void helper_zimt_settag(CPURISCVState *env, target_ulong ptr,
+                        target_ulong count, target_ulong pc)
 {
     uintptr_t ra = GETPC();
     int mmu_idx = riscv_env_mmu_index(env, false);
@@ -159,6 +160,15 @@ void helper_zimt_settag(CPURISCVState *env, target_ulong ptr, target_ulong count
     for (i = 0; i < chunks; i++) {
         target_ulong cur = va + (i << 4);
 
+#ifndef CONFIG_USER_ONLY
+        if (env->priv == PRV_U && !dasics_in_trusted_zone(env, pc) &&
+            !(env->dasics_state.maincfg & MCFG_CUST) &&
+            !dasics_match_dlib(env, cur, LIBCFG_V | LIBCFG_W)) {
+            env->badaddr = cur;
+            env->dasics_state.dfreason = DFR_SF;
+            riscv_raise_exception(env, RISCV_EXCP_DASICS_U_CHECK_FAULT, ra);
+        }
+#endif
         if (riscv_zimt_addr_in_vitt(env, cur, mmu_idx)) {
             riscv_raise_exception(env, RISCV_EXCP_STORE_AMO_ACCESS_FAULT, ra);
         }
@@ -166,11 +176,12 @@ void helper_zimt_settag(CPURISCVState *env, target_ulong ptr, target_ulong count
     }
 }
 
-void helper_zimt_checktag(CPURISCVState *env, target_ulong ptr, target_ulong count)
+void helper_zimt_checktag(CPURISCVState *env, target_ulong ptr,
+                          target_ulong count, target_ulong pc)
 {
     uintptr_t ra = GETPC();
     int mmu_idx = riscv_env_mmu_index(env, false);
-    target_ulong va, tag;
+    target_ulong va, tag, mc_tag;
     uint32_t i, chunks = count & 0xf;
 
     if (!riscv_cpu_cfg(env)->ext_zimt || !riscv_zimt_mt_enabled(env, mmu_idx)) {
@@ -189,16 +200,33 @@ void helper_zimt_checktag(CPURISCVState *env, target_ulong ptr, target_ulong cou
 
     for (i = 0; i < chunks; i++) {
         target_ulong cur = va + (i << 4);
-        target_ulong mc_tag = riscv_zimt_tag_load(env, cur, mmu_idx, ra);
+
+#ifndef CONFIG_USER_ONLY
+        if (env->priv == PRV_U && !dasics_in_trusted_zone(env, pc) &&
+            !(env->dasics_state.maincfg & MCFG_CULT) &&
+            !dasics_match_dlib(env, cur, LIBCFG_V | LIBCFG_R)) {
+            env->badaddr = cur;
+            env->dasics_state.dfreason = DFR_LF;
+            riscv_raise_exception(env, RISCV_EXCP_DASICS_U_CHECK_FAULT, ra);
+        }
+#endif
+        mc_tag = riscv_zimt_tag_load(env, cur, mmu_idx, ra);
 
         if (mc_tag != tag) {
+#ifndef CONFIG_USER_ONLY
+            if (env->priv == PRV_U && !dasics_in_trusted_zone(env, pc)) {
+                env->badaddr = cur;
+                env->dasics_state.dfreason = DFR_TF;
+                riscv_raise_exception(env, RISCV_EXCP_DASICS_U_CHECK_FAULT, ra);
+            }
+#endif
             env->sw_check_code = RISCV_EXCP_SW_CHECK_MTE_TVAL;
             riscv_raise_exception(env, RISCV_EXCP_SW_CHECK, ra);
         }
     }
 }
 
-void helper_zimt_check_ls(CPURISCVState *env, target_ulong ptr)
+void helper_zimt_check_ls(CPURISCVState *env, target_ulong ptr, target_ulong pc)
 {
     uintptr_t ra = GETPC();
     int mmu_idx = riscv_env_mmu_index(env, false);
@@ -257,6 +285,13 @@ void helper_zimt_check_ls(CPURISCVState *env, target_ulong ptr)
     tag = zimt_ptr_extract_tag(env, ptr, mmu_idx);
     mc_tag = riscv_zimt_tag_load(env, va, mmu_idx, ra);
     if (mc_tag != tag) {
+#ifndef CONFIG_USER_ONLY
+        if (env->priv == PRV_U && !dasics_in_trusted_zone(env, pc)) {
+            env->badaddr = va;
+            env->dasics_state.dfreason = DFR_TF;
+            riscv_raise_exception(env, RISCV_EXCP_DASICS_U_CHECK_FAULT, ra);
+        }
+#endif
         env->sw_check_code = RISCV_EXCP_SW_CHECK_MTE_TVAL;
         riscv_raise_exception(env, RISCV_EXCP_SW_CHECK, ra);
     }

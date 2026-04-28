@@ -3291,20 +3291,20 @@ static const TypeInfo riscv_cpu_type_infos[] = {
         .cfg.ext_zksh = true,
         .cfg.ext_svinval = true,
 
-	/* extensions for memory tagging */
-	.cfg.ext_zimop = false,
+        /* extensions for memory tagging */
+        .cfg.ext_zimop = false,
 
-	/* TODO: add addtional extensions for dasics */
-	.cfg.ext_dasics = true,
+        /* TODO: add addtional extensions for dasics */
+        .cfg.ext_dasics = true,
 
-	/* extensions for pointer masking */
+        /* extensions for pointer masking */
     	.cfg.ext_ssnpm = false,
     	.cfg.ext_smnpm = false,
     	.cfg.ext_smmpm = false,
 	
-	/* extensions for storing tags */
-	.cfg.ext_zimop = false,
-	.cfg.ext_svatag = false,
+        /* extensions for storing tags */
+        .cfg.ext_zimop = false,
+        .cfg.ext_svatag = false,
 
         .cfg.mmu = true,
         .cfg.pmp = true,
@@ -3333,17 +3333,53 @@ static const TypeInfo riscv_cpu_type_infos[] = {
     	.cfg.ext_smnpm = true,
     	.cfg.ext_smmpm = true,
 
-	.cfg.ext_svukte = true,
-	.cfg.ext_svatag = true,
-	.cfg.ext_smvatag = true, 
-	.cfg.ext_zimop = true,
-	.cfg.ext_zimt = true,
+        .cfg.ext_svukte = true,
+        .cfg.ext_svatag = true,
+        .cfg.ext_smvatag = true, 
+        .cfg.ext_zimop = true,
+        .cfg.ext_zimt = true,
 
         .cfg.mmu = true,
         .cfg.pmp = true,
 
         .cfg.max_satp_mode = VM_1_10_SV39,
     ),
+
+    DEFINE_RISCV_CPU(TYPE_RISCV_CPU_XIANGSHAN_FDIMTE, TYPE_RISCV_VENDOR_CPU,
+        .misa_mxl_max = MXL_RV64,
+        .misa_ext = RVG | RVC | RVB | RVS | RVU | RVN,
+        .priv_spec = PRIV_VERSION_1_13_0,
+
+        /* ISA extensions */
+        .cfg.ext_zbc = true,
+        .cfg.ext_zbkb = true,
+        .cfg.ext_zbkc = true,
+        .cfg.ext_zbkx = true,
+        .cfg.ext_zknd = true,
+        .cfg.ext_zkne = true,
+        .cfg.ext_zknh = true,
+        .cfg.ext_zksed = true,
+        .cfg.ext_zksh = true,
+        .cfg.ext_svinval = true,
+
+    	.cfg.ext_ssnpm = true,
+    	.cfg.ext_smnpm = true,
+    	.cfg.ext_smmpm = true,
+
+        .cfg.ext_svukte = true,
+        .cfg.ext_svatag = true,
+        .cfg.ext_smvatag = true, 
+        .cfg.ext_zimop = true,
+        .cfg.ext_zimt = true,
+
+        .cfg.ext_dasics = true,
+
+        .cfg.mmu = true,
+        .cfg.pmp = true,
+
+        .cfg.max_satp_mode = VM_1_10_SV39,
+    ),
+
 
     DEFINE_RISCV_CPU(TYPE_RISCV_CPU_XIANGSHAN_KMH, TYPE_RISCV_VENDOR_CPU,
         .misa_mxl_max = MXL_RV64,

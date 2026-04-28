@@ -14,7 +14,11 @@ static bool trans_zimt_tagop(DisasContext *ctx, arg_zimt_tag *a)
 
     if (a->rd == 0) {
         TCGv src = get_gpr(ctx, a->rs1, EXT_NONE);
-        gen_helper_zimt_checktag(tcg_env, src, tcg_constant_tl(a->tag_imm4));
+        TCGv pc_now = tcg_temp_new();
+
+        gen_pc_plus_diff(pc_now, ctx, 0);
+        gen_helper_zimt_checktag(tcg_env, src, tcg_constant_tl(a->tag_imm4),
+                                 pc_now);
         return true;
     }
 
@@ -37,8 +41,12 @@ static bool trans_zimt_tagop(DisasContext *ctx, arg_zimt_tag *a)
 
 static bool trans_zimt_settag(DisasContext *ctx, arg_zimt_settag *a)
 {
+    TCGv pc_now;
+
     REQUIRE_ZIMT(ctx);
+    pc_now = tcg_temp_new();
+    gen_pc_plus_diff(pc_now, ctx, 0);
     gen_helper_zimt_settag(tcg_env, get_gpr(ctx, a->rs1, EXT_NONE),
-                           tcg_constant_tl(a->tag_imm4));
+                           tcg_constant_tl(a->tag_imm4), pc_now);
     return true;
 }

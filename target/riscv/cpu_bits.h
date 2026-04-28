@@ -887,6 +887,7 @@ typedef enum RISCVException {
 #define DFR_LF  2 /* DASICS Load Fault */
 #define DFR_SF  3 /* DASICS Store Fault */
 #define DFR_JF  4 /* DASICS Jump Fault */
+#define DFR_TF  7 /* DASICS Zimt Tag Fault */
 
 /* Interrupt causes */
 #define IRQ_U_SOFT                         0

@@ -58,6 +58,7 @@
 /* TODO: add dasics configurations */
 #define TYPE_RISCV_CPU_XIANGSHAN_DASICS RISCV_CPU_TYPE_NAME("xiangshan-dasics")
 #define TYPE_RISCV_CPU_XIANGSHAN_NHMTE  RISCV_CPU_TYPE_NAME("xiangshan-nanhu-mte")
+#define TYPE_RISCV_CPU_XIANGSHAN_FDIMTE RISCV_CPU_TYPE_NAME("xiangshan-dasics-mte")
 #define TYPE_RISCV_CPU_XIANGSHAN_KMH    RISCV_CPU_TYPE_NAME("xiangshan-kunminghu")
 #define TYPE_RISCV_CPU_HOST             RISCV_CPU_TYPE_NAME("host")
 

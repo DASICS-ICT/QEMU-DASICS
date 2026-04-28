@@ -392,8 +392,11 @@ static void gen_zimt_check_ls(DisasContext *ctx, int rs1, int imm)
 {
     if (ctx->zimt_active) {
         TCGv raw_addr = tcg_temp_new();
+        TCGv pc_now = tcg_temp_new();
+
         tcg_gen_addi_tl(raw_addr, get_gpr(ctx, rs1, EXT_NONE), imm);
-        gen_helper_zimt_check_ls(tcg_env, raw_addr);
+        gen_pc_plus_diff(pc_now, ctx, 0);
+        gen_helper_zimt_check_ls(tcg_env, raw_addr, pc_now);
     }
 }
 
