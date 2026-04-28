@@ -6298,7 +6298,7 @@ static RISCVException write_dlbound(CPURISCVState *env, int csrno,
     return RISCV_EXCP_NONE;
 }
 
-static RISCVException read_dljmpcfg(CPURISCVState *env, int csrno, target_ulong *val)
+static RISCVException read_djcfg(CPURISCVState *env, int csrno, target_ulong *val)
 {
     uint32_t step = 16;
 
@@ -6316,8 +6316,8 @@ static RISCVException read_dljmpcfg(CPURISCVState *env, int csrno, target_ulong 
     return RISCV_EXCP_NONE;
 }
 
-static RISCVException write_dljmpcfg(CPURISCVState *env, int csrno,
-                                     target_ulong val, uintptr_t ra)
+static RISCVException write_djcfg(CPURISCVState *env, int csrno,
+                                  target_ulong val, uintptr_t ra)
 {
     uint32_t step = 16;  // RV64
 
@@ -6332,25 +6332,25 @@ static RISCVException write_dljmpcfg(CPURISCVState *env, int csrno,
     return RISCV_EXCP_NONE;
 }
 
-static RISCVException read_dlibjmpbound(CPURISCVState *env, int csrno, target_ulong *val)
+static RISCVException read_djbound(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    int idx = csrno - CSR_DLIBJMPBOUND0;
+    int idx = csrno - CSR_DJBOUND0;
 
     if (0 <= idx && idx < (MAX_DASICS_LIBJMPBOUNDS << 1)) {
         *val = !(idx & 0x1) ? env->dasics_state.libjmpbound[idx >> 1].lo:
                               env->dasics_state.libjmpbound[idx >> 1].hi;
     } else {
         qemu_log_mask(LOG_GUEST_ERROR,
-                "Ignoring dlibjmplbound read: Out of range! csrno = %d\n", csrno);
+                "Ignoring djbound read: Out of range! csrno = %d\n", csrno);
     }
 
     return RISCV_EXCP_NONE;
 }
 
-static RISCVException write_dlibjmplbound(CPURISCVState *env, int csrno,
-                                          target_ulong val, uintptr_t ra)
+static RISCVException write_djbound(CPURISCVState *env, int csrno,
+                                    target_ulong val, uintptr_t ra)
 {
-    int idx = csrno - CSR_DLIBJMPBOUND0;
+    int idx = csrno - CSR_DJBOUND0;
 
     if (0 <= idx && idx < (MAX_DASICS_LIBJMPBOUNDS << 1)) {
         if (!(idx & 0x1)) {
@@ -6360,7 +6360,7 @@ static RISCVException write_dlibjmplbound(CPURISCVState *env, int csrno,
         }
     } else {
         qemu_log_mask(LOG_GUEST_ERROR,
-                "Ignoring dlibjmplbound write: Out of range! csrno = %d\n", csrno);
+                "Ignoring djbound write: Out of range! csrno = %d\n", csrno);
     }
 
     return RISCV_EXCP_NONE;
@@ -6466,10 +6466,10 @@ static RISCVException write_dsmcfg(CPURISCVState *env, int csrno,
     //         write_dlbound(env, CSR_DLBOUND1 + (i << 1), 0);
     //     }
 
-    //     write_dljmpcfg(env, CSR_DJMPCFG, 0);
+    //     write_djcfg(env, CSR_DJCFG, 0);
     //     for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
-    //         write_dlbound(env, CSR_DLIBJMPBOUND0 + (i << 1), 0);
-    //         write_dlbound(env, CSR_DLIBJMPBOUND1 + (i << 1), 0);
+    //         write_dlbound(env, CSR_DJBOUND0 + (i << 1), 0);
+    //         write_dlbound(env, CSR_DJBOUND1 + (i << 1), 0);
     //     }
 
     //     write_dmaincall(env, CSR_DMAINCALL, 0);
@@ -7436,16 +7436,16 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_DLBOUND30]      = {"dlbound30",    dasics,     read_dlbound,   write_dlbound   },
     [CSR_DLBOUND31]      = {"dlbound31",    dasics,     read_dlbound,   write_dlbound   },
 
-    [CSR_DLIBJMPBOUND0]  = {"dlibjmpbound0",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND1]  = {"dlibjmpbound1",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND2]  = {"dlibjmpbound2",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND3]  = {"dlibjmpbound3",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND4]  = {"dlibjmpbound4",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND5]  = {"dlibjmpbound5",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND6]  = {"dlibjmpbound6",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
-    [CSR_DLIBJMPBOUND7]  = {"dlibjmpbound7",    dasics,     read_dlibjmpbound,      write_dlibjmplbound   },
+    [CSR_DJBOUND0]       = {"djbound0",     dasics,     read_djbound,   write_djbound   },
+    [CSR_DJBOUND1]       = {"djbound1",     dasics,     read_djbound,   write_djbound   },
+    [CSR_DJBOUND2]       = {"djbound2",     dasics,     read_djbound,   write_djbound   },
+    [CSR_DJBOUND3]       = {"djbound3",     dasics,     read_djbound,   write_djbound   },
+    [CSR_DJBOUND4]       = {"djbound4",     dasics,     read_djbound,   write_djbound   },
+    [CSR_DJBOUND5]       = {"djbound5",     dasics,     read_djbound,   write_djbound   },
+    [CSR_DJBOUND6]       = {"djbound6",     dasics,     read_djbound,   write_djbound   },
+    [CSR_DJBOUND7]       = {"djbound7",     dasics,     read_djbound,   write_djbound   },
 
-    [CSR_DJMPCFG]        = {"djmpcfg",      dasics,     read_dljmpcfg,  write_dljmpcfg      },
+    [CSR_DJCFG]          = {"djcfg",        dasics,     read_djcfg,     write_djcfg     },
 
     [CSR_DMAINCALL]      = {"dmaincall",    dasics,     read_dmaincall, write_dmaincall     },
     [CSR_DRETPC]         = {"dretpc",       dasics,     read_dretpc,    write_dretpc        },
