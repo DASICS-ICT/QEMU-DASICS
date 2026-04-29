@@ -3301,7 +3301,6 @@ static const TypeInfo riscv_cpu_type_infos[] = {
 	
         /* extensions for storing tags */
         .cfg.ext_zimop = false,
-        .cfg.ext_svatag = false,
 
         .cfg.mmu = true,
         .cfg.pmp = true,
