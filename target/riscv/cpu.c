@@ -1294,9 +1294,6 @@ const RISCVCPUMultiExtConfig riscv_cpu_extensions[] = {
     MULTI_EXT_CFG_BOOL("svade", ext_svade, false),
     MULTI_EXT_CFG_BOOL("svadu", ext_svadu, true),
 
-    /* TODO: add memory tagging storage area extension */
-    MULTI_EXT_CFG_BOOL("svatag", ext_svatag, false),
-
     MULTI_EXT_CFG_BOOL("svinval", ext_svinval, false),
     MULTI_EXT_CFG_BOOL("svnapot", ext_svnapot, false),
     MULTI_EXT_CFG_BOOL("svpbmt", ext_svpbmt, false),
@@ -3290,7 +3287,6 @@ static const TypeInfo riscv_cpu_type_infos[] = {
 	
 	/* extensions for storing tags */
         .cfg.ext_zimop = false,
-	    .cfg.ext_svatag = false,
 
         .cfg.mmu = true,
         .cfg.pmp = true,
