@@ -3291,9 +3291,6 @@ static const TypeInfo riscv_cpu_type_infos[] = {
         .cfg.ext_zksh = true,
         .cfg.ext_svinval = true,
 
-        /* extensions for memory tagging */
-        .cfg.ext_zimop = false,
-
         /* TODO: add addtional extensions for dasics */
         .cfg.ext_dasics = true,
 
