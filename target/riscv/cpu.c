@@ -3280,11 +3280,8 @@ static const TypeInfo riscv_cpu_type_infos[] = {
         .cfg.ext_zksh = true,
         .cfg.ext_svinval = true,
 
-  	/* extensions for memory tagging */
-	.cfg.ext_zimop = false,
-
 	/* TODO: add addtional extensions for dasics */
-	.cfg.ext_dasics = true,
+	    .cfg.ext_dasics = true,
 
 	/* extensions for pointer masking */
     	.cfg.ext_ssnpm = false,
@@ -3292,7 +3289,8 @@ static const TypeInfo riscv_cpu_type_infos[] = {
     	.cfg.ext_smmpm = false,
 	
 	/* extensions for storing tags */
-	.cfg.ext_svatag = false,
+        .cfg.ext_zimop = false,
+	    .cfg.ext_svatag = false,
 
         .cfg.mmu = true,
         .cfg.pmp = true,
