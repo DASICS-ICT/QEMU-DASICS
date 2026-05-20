@@ -4285,48 +4285,56 @@ static RISCVException write_jvt(CPURISCVState *env, int csrno,
 static RISCVException read_dmaincall(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->dasics_state.dmaincall;
+    trace_riscv_dasics_csr_read(env->pc, csrno, *val);
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException write_dmaincall(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->dasics_state.dmaincall = val;
+    trace_riscv_dasics_csr_write(env->pc, csrno, val);
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException read_dretpc(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->dasics_state.dretpc;
+    trace_riscv_dasics_csr_read(env->pc, csrno, *val);
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException write_dretpc(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->dasics_state.dretpc = val;
+    trace_riscv_dasics_csr_write(env->pc, csrno, val);
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException read_dretpcactz(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->dasics_state.dretpcactz;
+    trace_riscv_dasics_csr_read(env->pc, csrno, *val);
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException write_dretpcactz(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->dasics_state.dretpcactz = val;
+    trace_riscv_dasics_csr_write(env->pc, csrno, val);
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException read_dfreason(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->dasics_state.dfreason;
+    trace_riscv_dasics_csr_read(env->pc, csrno, *val);
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException write_dfreason(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->dasics_state.dfreason = val;
+    trace_riscv_dasics_csr_write(env->pc, csrno, val);
     return RISCV_EXCP_NONE;
 }
 
@@ -4342,6 +4350,7 @@ static RISCVException read_dlcfg(CPURISCVState *env, int csrno, target_ulong *va
         _val |= (cfgval << (i * step));
     }
     *val = _val;
+    trace_riscv_dasics_csr_read(env->pc, csrno, *val);
 
     return RISCV_EXCP_NONE;
 }
@@ -4356,6 +4365,7 @@ static RISCVException write_dlcfg(CPURISCVState *env, int csrno, target_ulong va
         cfgval = (val >> (step * i)) & LIBCFG_MASK;
         env->dasics_state.libcfg[i] = cfgval;
     }
+    trace_riscv_dasics_csr_write(env->pc, csrno, val);
 
     return RISCV_EXCP_NONE;
 }
@@ -4367,6 +4377,7 @@ static RISCVException read_dlbound(CPURISCVState *env, int csrno, target_ulong *
     if (0 <= idx && idx < (MAX_DASICS_LIBBOUNDS << 1)) {
         *val = !(idx & 0x1) ? env->dasics_state.libbound[idx >> 1].lo:
                               env->dasics_state.libbound[idx >> 1].hi;
+        trace_riscv_dasics_csr_read(env->pc, csrno, *val);
     } else {
         qemu_log_mask(LOG_GUEST_ERROR,
                 "Ignoring dlbound read: Out of range! csrno = %d\n", csrno);
@@ -4385,6 +4396,7 @@ static RISCVException write_dlbound(CPURISCVState *env, int csrno, target_ulong 
         } else {
             env->dasics_state.libbound[idx >> 1].hi = val;
         }
+        trace_riscv_dasics_csr_write(env->pc, csrno, val);
     } else {
         qemu_log_mask(LOG_GUEST_ERROR,
                 "Ignoring dlbound write: Out of range! csrno = %d\n", csrno);
@@ -4407,6 +4419,7 @@ static RISCVException read_dljmpcfg(CPURISCVState *env, int csrno, target_ulong 
     }
 
     *val = _val;
+    trace_riscv_dasics_csr_read(env->pc, csrno, *val);
 
     return RISCV_EXCP_NONE;
 }
@@ -4422,6 +4435,7 @@ static RISCVException write_dljmpcfg(CPURISCVState *env, int csrno, target_ulong
         cfgval = (val >> (step * i)) & LIBJMPCFG_MASK;
         env->dasics_state.libjmpcfg[i] = cfgval;
     }
+    trace_riscv_dasics_csr_write(env->pc, csrno, val);
 
     return RISCV_EXCP_NONE;
 }
@@ -4434,6 +4448,7 @@ static RISCVException read_dlibjmpbound(CPURISCVState *env, int csrno, target_ul
     if (0 <= idx && idx < (MAX_DASICS_LIBJMPBOUNDS << 1)) {
         *val = !(idx & 0x1) ? env->dasics_state.libjmpbound[idx >> 1].lo:
                               env->dasics_state.libjmpbound[idx >> 1].hi;
+        trace_riscv_dasics_csr_read(env->pc, csrno, *val);
     } else {
         qemu_log_mask(LOG_GUEST_ERROR,
                 "Ignoring dlibjmplbound read: Out of range! csrno = %d\n", csrno);
@@ -4452,6 +4467,7 @@ static RISCVException write_dlibjmplbound(CPURISCVState *env, int csrno, target_
         } else {
             env->dasics_state.libjmpbound[idx >> 1].hi = val;
         }
+        trace_riscv_dasics_csr_write(env->pc, csrno, val);
     } else {
         qemu_log_mask(LOG_GUEST_ERROR,
                 "Ignoring dlibjmplbound write: Out of range! csrno = %d\n", csrno);
@@ -4465,9 +4481,11 @@ static RISCVException read_dsmbound(CPURISCVState *env, int csrno, target_ulong 
     switch(csrno) {
     case CSR_DSMBOUND0:
         *val = env->dasics_state.smbound.lo;
+        trace_riscv_dasics_csr_read(env->pc, csrno, *val);
         break;
     case CSR_DSMBOUND1:
         *val = env->dasics_state.smbound.hi;
+        trace_riscv_dasics_csr_read(env->pc, csrno, *val);
         break;
     default:
         qemu_log_mask(LOG_GUEST_ERROR, \
@@ -4483,9 +4501,11 @@ static RISCVException write_dsmbound(CPURISCVState *env, int csrno, target_ulong
     switch(csrno) {
     case CSR_DSMBOUND0:
         env->dasics_state.smbound.lo = val;
+        trace_riscv_dasics_csr_write(env->pc, csrno, val);
         break;
     case CSR_DSMBOUND1:
         env->dasics_state.smbound.hi = val;
+        trace_riscv_dasics_csr_write(env->pc, csrno, val);
         break;
     default:
         qemu_log_mask(LOG_GUEST_ERROR, \
@@ -4502,10 +4522,12 @@ static RISCVException read_dumbound(CPURISCVState *env, int csrno, target_ulong 
     case CSR_DUMBOUND0:
     case CSR_DUMBOUND0_UL:
         *val = env->dasics_state.umbound.lo;
+        trace_riscv_dasics_csr_read(env->pc, csrno, *val);
         break;
     case CSR_DUMBOUND1:
     case CSR_DUMBOUND1_UL:
         *val = env->dasics_state.umbound.hi;
+        trace_riscv_dasics_csr_read(env->pc, csrno, *val);
         break;
     default:
         qemu_log_mask(LOG_GUEST_ERROR, \
@@ -4522,10 +4544,12 @@ static RISCVException write_dumbound(CPURISCVState *env, int csrno, target_ulong
     case CSR_DUMBOUND0:
     case CSR_DUMBOUND0_UL:
         env->dasics_state.umbound.lo = val;
+        trace_riscv_dasics_csr_write(env->pc, csrno, val);
         break;
     case CSR_DUMBOUND1:
     case CSR_DUMBOUND1_UL:
         env->dasics_state.umbound.hi = val;
+        trace_riscv_dasics_csr_write(env->pc, csrno, val);
         break;
     default:
         qemu_log_mask(LOG_GUEST_ERROR, \
@@ -4539,6 +4563,7 @@ static RISCVException write_dumbound(CPURISCVState *env, int csrno, target_ulong
 static RISCVException read_dsmcfg(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->dasics_state.maincfg & SMCFG_MASK;
+    trace_riscv_dasics_csr_read(env->pc, csrno, *val);
     return RISCV_EXCP_NONE; 
 }
 
@@ -4577,6 +4602,7 @@ static RISCVException write_dsmcfg(CPURISCVState *env, int csrno, target_ulong v
     target_ulong mask = (csrno == CSR_DSMCFG) ? SMCFG_MASK : UMCFG_MASK;
     env->dasics_state.maincfg = (env->dasics_state.maincfg & ~mask) |
                                 (val & mask);
+    trace_riscv_dasics_csr_write(env->pc, csrno, val);
 
     return RISCV_EXCP_NONE;
 }
@@ -4584,14 +4610,16 @@ static RISCVException write_dsmcfg(CPURISCVState *env, int csrno, target_ulong v
 static RISCVException read_dumcfg(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->dasics_state.maincfg & UMCFG_MASK;
+    trace_riscv_dasics_csr_read(env->pc, csrno, *val);
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException write_dumcfg(CPURISCVState *env, int csrno, target_ulong val)
 {
-    target_ulong newval = (env->dasics_state.maincfg & ~UMCFG_MASK) |
-                          (val & UMCFG_MASK);
-    return write_dsmcfg(env, CSR_DSMCFG, newval);
+    env->dasics_state.maincfg = (env->dasics_state.maincfg & ~UMCFG_MASK) |
+                                (val & UMCFG_MASK);
+    trace_riscv_dasics_csr_write(env->pc, csrno, val);
+    return RISCV_EXCP_NONE;
 }
 
 /*
