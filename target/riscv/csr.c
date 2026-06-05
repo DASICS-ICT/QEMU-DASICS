@@ -4095,12 +4095,15 @@ static inline RISCVException riscv_csrrw_check(CPURISCVState *env,
     }
 
     if (!env->debugger && effective_priv == PRV_U && !dasics_in_trusted_zone(env, env->pc)) {
-        if ((csrno >= CSR_DUMCFG && csrno <= CSR_DUMBOUND1) ||
-            (csrno >= CSR_DLCFG && csrno <= CSR_DFREASON)   ||
-            (csrno >= CSR_USCRATCH && csrno <= CSR_UTIMECMP)||
-            (csrno == CSR_USTATUS)||
-            (csrno == CSR_UIE)||
-            (csrno == CSR_UTVEC))
+        bool dmaincall_read = (csrno == CSR_DMAINCALL) && !write_mask;
+        bool dasics_csr = (csrno >= CSR_DUMCFG && csrno <= CSR_DUMBOUND1) ||
+                          (csrno >= CSR_DLCFG && csrno <= CSR_DFREASON);
+        bool rvn_csr = (csrno >= CSR_USCRATCH && csrno <= CSR_UTIMECMP) ||
+                       (csrno == CSR_USTATUS) ||
+                       (csrno == CSR_UIE) ||
+                       (csrno == CSR_UTVEC);
+
+        if ((dasics_csr && !dmaincall_read) || rvn_csr)
             return RISCV_EXCP_ILLEGAL_INST;
     }
 #endif
