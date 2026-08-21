@@ -4370,9 +4370,9 @@ static RISCVException write_dlbound(CPURISCVState *env, int csrno, target_ulong 
 
     if (0 <= idx && idx < (MAX_DASICS_LIBBOUNDS << 1)) {
         if (!(idx & 0x1)) {
-            env->dasics_state.libbound[idx >> 1].lo = val;
+            env->dasics_state.libbound[idx >> 1].lo = dasics_bound_warl_mem(val);
         } else {
-            env->dasics_state.libbound[idx >> 1].hi = val;
+            env->dasics_state.libbound[idx >> 1].hi = dasics_bound_warl_mem(val);
         }
     } else {
         qemu_log_mask(LOG_GUEST_ERROR,
@@ -4437,9 +4437,9 @@ static RISCVException write_djbound(CPURISCVState *env, int csrno, target_ulong 
 
     if (0 <= idx && idx < (MAX_DASICS_LIBJMPBOUNDS << 1)) {
         if (!(idx & 0x1)) {
-            env->dasics_state.libjmpbound[idx >> 1].lo = val;
+            env->dasics_state.libjmpbound[idx >> 1].lo = dasics_bound_warl_jump(val);
         } else {
-            env->dasics_state.libjmpbound[idx >> 1].hi = val;
+            env->dasics_state.libjmpbound[idx >> 1].hi = dasics_bound_warl_jump(val);
         }
     } else {
         qemu_log_mask(LOG_GUEST_ERROR,
@@ -4471,10 +4471,10 @@ static RISCVException write_dsmbound(CPURISCVState *env, int csrno, target_ulong
 {
     switch(csrno) {
     case CSR_DSMBOUND0:
-        env->dasics_state.smbound.lo = val;
+        env->dasics_state.smbound.lo = dasics_bound_warl_main(val);
         break;
     case CSR_DSMBOUND1:
-        env->dasics_state.smbound.hi = val;
+        env->dasics_state.smbound.hi = dasics_bound_warl_main(val);
         break;
     default:
         qemu_log_mask(LOG_GUEST_ERROR, \
@@ -4507,10 +4507,10 @@ static RISCVException write_dumbound(CPURISCVState *env, int csrno, target_ulong
 {
     switch(csrno) {
     case CSR_DUMBOUND0:
-        env->dasics_state.umbound.lo = val;
+        env->dasics_state.umbound.lo = dasics_bound_warl_main(val);
         break;
     case CSR_DUMBOUND1:
-        env->dasics_state.umbound.hi = val;
+        env->dasics_state.umbound.hi = dasics_bound_warl_main(val);
         break;
     default:
         qemu_log_mask(LOG_GUEST_ERROR, \

@@ -35,6 +35,30 @@
 #define MAX_DASICS_LIBBOUNDS 16
 #define MAX_DASICS_LIBJMPBOUNDS 4
 
+/*
+ * Bound CSRs are WARL: physical storage follows SV39 VAddrBits.
+ * Grain differs by class — mem 1B, jump 2B, main 8B — applied on write.
+ */
+#define DASICS_VADDR_BITS          39
+#define DASICS_VADDR_MASK          ((target_ulong)((1ULL << DASICS_VADDR_BITS) - 1))
+#define DASICS_JUMP_GRAIN_MASK     (~(target_ulong)1)
+#define DASICS_MAIN_GRAIN_MASK     (~(target_ulong)7)
+
+static inline target_ulong dasics_bound_warl_mem(target_ulong val)
+{
+    return val & DASICS_VADDR_MASK;
+}
+
+static inline target_ulong dasics_bound_warl_jump(target_ulong val)
+{
+    return val & DASICS_VADDR_MASK & DASICS_JUMP_GRAIN_MASK;
+}
+
+static inline target_ulong dasics_bound_warl_main(target_ulong val)
+{
+    return val & DASICS_VADDR_MASK & DASICS_MAIN_GRAIN_MASK;
+}
+
 typedef struct {
     target_ulong hi;
     target_ulong lo;
@@ -59,6 +83,7 @@ typedef struct {
 
 int dasics_in_trusted_zone(CPURISCVState *env, target_ulong pc);
 int dasics_in_active_zone(CPURISCVState *env, target_ulong pc);
-int dasics_match_dlib(CPURISCVState *env, target_ulong addr, target_ulong cfg);
+int dasics_match_dlib(CPURISCVState *env, target_ulong addr,
+                      target_ulong len, target_ulong cfg);
 
 #endif

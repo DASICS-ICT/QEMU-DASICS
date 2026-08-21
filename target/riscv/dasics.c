@@ -18,6 +18,8 @@
 int dasics_in_trusted_zone(CPURISCVState *env, target_ulong pc) 
 {
 #ifndef CONFIG_USER_ONLY
+    pc &= DASICS_VADDR_MASK;
+
     int is_smain_enable = env->dasics_state.smbound.lo < env->dasics_state.smbound.hi && \
                           (env->dasics_state.maincfg & MCFG_SENA);
     int is_umain_enable = env->dasics_state.umbound.lo < env->dasics_state.umbound.hi && \
@@ -40,6 +42,7 @@ int dasics_in_trusted_zone(CPURISCVState *env, target_ulong pc)
 int dasics_in_active_zone(CPURISCVState *env, target_ulong pc)
 {
 #ifndef CONFIG_USER_ONLY
+    pc &= DASICS_VADDR_MASK;
 
     int withinRange = 0;
     for (int i = 0; i < MAX_DASICS_LIBJMPBOUNDS; ++i) {
@@ -58,16 +61,27 @@ int dasics_in_active_zone(CPURISCVState *env, target_ulong pc)
     return 0;
 }
 
-int dasics_match_dlib(CPURISCVState *env, target_ulong addr, target_ulong cfg) {
-    // Check whether the addr is within dlbounds which is marked as cfg
+int dasics_match_dlib(CPURISCVState *env, target_ulong addr,
+                      target_ulong len, target_ulong cfg)
+{
 #ifndef CONFIG_USER_ONLY
+    /*
+     * Whole access [addr, addr+len) must sit in one bound.
+     * 39-bit addr+len overflow is not a hit: wrapping must not match
+     * a low-address bound.
+     */
+    addr &= DASICS_VADDR_MASK;
+    if (len == 0 || addr > DASICS_VADDR_MASK - len) {
+        return 0;
+    }
 
+    target_ulong end = addr + len;
     int withinRange = 0;
     for (int i = 0; i < MAX_DASICS_LIBBOUNDS; ++i) {
         uint8_t cfgval = env->dasics_state.libcfg[i];
         target_ulong boundhi = env->dasics_state.libbound[i].hi;
         target_ulong boundlo = env->dasics_state.libbound[i].lo;
-        if (!((cfgval & cfg) ^ cfg) && boundlo <= addr && addr < boundhi) {
+        if (!((cfgval & cfg) ^ cfg) && boundlo <= addr && end <= boundhi) {
             withinRange = 1;
             break;
         }

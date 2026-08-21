@@ -562,7 +562,8 @@ target_ulong helper_hyp_hlvx_wu(CPURISCVState *env, target_ulong addr)
 }
 
 /* DASICS helpers */
-void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
+void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc,
+                            target_ulong addr, target_ulong len)
 {
     // Load from trusted code zone is permitted
     if (/*!riscv_feature(env, RISCV_FEATURE_DASICS) ||*/
@@ -570,8 +571,8 @@ void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong ad
         return;
     }
 
-    // Check whether target address is within dlibbounds
-    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_R) && 
+    // Check whether the whole access sits in one dlibbound
+    if (!dasics_match_dlib(env, addr, len, LIBCFG_V | LIBCFG_R) &&
         ((env->priv == PRV_U && !(env->dasics_state.maincfg & MCFG_CULT)) ||
          (env->priv == PRV_S && !(env->dasics_state.maincfg & MCFG_CSLT)))) {
         uint32_t exception = (env->priv == PRV_U) ?
@@ -583,7 +584,8 @@ void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong ad
     }
 }
 
-void helper_dasics_st_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
+void helper_dasics_st_check(CPURISCVState *env, target_ulong pc,
+                            target_ulong addr, target_ulong len)
 {
     // Store from trusted code zone is permitted
     if (/*!riscv_feature(env, RISCV_FEATURE_DASICS) || */
@@ -591,8 +593,8 @@ void helper_dasics_st_check(CPURISCVState *env, target_ulong pc, target_ulong ad
         return;
     }
 
-    // Check whether target address is within dlibbounds
-    if (!dasics_match_dlib(env, addr, LIBCFG_V | LIBCFG_W) && 
+    // Check whether the whole access sits in one dlibbound
+    if (!dasics_match_dlib(env, addr, len, LIBCFG_V | LIBCFG_W) &&
         ((env->priv == PRV_U && !(env->dasics_state.maincfg & MCFG_CUST)) ||
          (env->priv == PRV_S && !(env->dasics_state.maincfg & MCFG_CSST)))) {
         uint32_t exception = (env->priv == PRV_U) ?
