@@ -562,6 +562,15 @@ target_ulong helper_hyp_hlvx_wu(CPURISCVState *env, target_ulong addr)
 }
 
 /* DASICS helpers */
+void helper_dasics_csr_write_check(CPURISCVState *env, target_ulong pc)
+{
+    if (riscv_cpu_cfg(env)->dasics && env->priv == PRV_S &&
+        (env->dasics_state.maincfg & MCFG_SENA) &&
+        !dasics_in_trusted_zone(env, pc)) {
+        riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+    }
+}
+
 void helper_dasics_ld_check(CPURISCVState *env, target_ulong pc, target_ulong addr)
 {
     // Load from trusted code zone is permitted

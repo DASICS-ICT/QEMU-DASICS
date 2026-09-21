@@ -20,5 +20,17 @@ EXTRA_RUNS += run-issue1060
 run-issue1060: issue1060
 	$(call run-test, $<, $(QEMU) $(QEMU_OPTS)$<)
 
+EXTRA_TESTS += dasics-csr-write
+dasics-csr-write.o: CFLAGS += -march=rv64gcv -mabi=lp64d -fno-pie
+DASICS_QEMU_OPTS = -M virt -display none -serial none -monitor none \
+                  -bios none -semihosting
+EXTRA_RUNS += run-dasics-csr-write run-dasics-csr-write-no-h
+run-dasics-csr-write: dasics-csr-write
+	$(call run-test, $<, $(QEMU) $(DASICS_QEMU_OPTS) \
+		-cpu rv64$(COMMA)v=true$(COMMA)h=true -kernel $<)
+run-dasics-csr-write-no-h: dasics-csr-write
+	$(call run-test, $<, $(QEMU) $(DASICS_QEMU_OPTS) \
+		-cpu rv64$(COMMA)v=true$(COMMA)h=false -kernel $<)
+
 # We don't currently support the multiarch system tests
 undefine MULTIARCH_TESTS

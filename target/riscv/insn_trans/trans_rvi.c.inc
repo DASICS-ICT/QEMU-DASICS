@@ -872,11 +872,30 @@ static bool do_csrr(DisasContext *ctx, int rd, int rc)
     return do_csr_post(ctx);
 }
 
+/*
+ * The decoder sends only write-requesting instructions to do_csrw/do_csrrw
+ * (including their RV128 variants). In particular, CSRRS/CSRRC with rs1 != x0
+ * request a write even when the register contains zero. Check before any CSR
+ * accessor or destination-register update, using the instruction's actual PC.
+ */
+static void gen_dasics_csr_write_check(DisasContext *ctx)
+{
+#ifndef CONFIG_USER_ONLY
+    if (ctx->cfg_ptr->dasics && ctx->priv == PRV_S) {
+        TCGv pc = tcg_temp_new();
+
+        gen_pc_plus_diff(pc, ctx, 0);
+        gen_helper_dasics_csr_write_check(cpu_env, pc);
+    }
+#endif
+}
+
 static bool do_csrw(DisasContext *ctx, int rc, TCGv src)
 {
     TCGv_i32 csr = tcg_constant_i32(rc);
 
     translator_io_start(&ctx->base);
+    gen_dasics_csr_write_check(ctx);
     gen_helper_csrw(cpu_env, csr, src);
     return do_csr_post(ctx);
 }
@@ -887,6 +906,7 @@ static bool do_csrrw(DisasContext *ctx, int rd, int rc, TCGv src, TCGv mask)
     TCGv_i32 csr = tcg_constant_i32(rc);
 
     translator_io_start(&ctx->base);
+    gen_dasics_csr_write_check(ctx);
     gen_helper_csrrw(dest, cpu_env, csr, src, mask);
     gen_set_gpr(ctx, rd, dest);
     return do_csr_post(ctx);
@@ -910,6 +930,7 @@ static bool do_csrw_i128(DisasContext *ctx, int rc, TCGv srcl, TCGv srch)
     TCGv_i32 csr = tcg_constant_i32(rc);
 
     translator_io_start(&ctx->base);
+    gen_dasics_csr_write_check(ctx);
     gen_helper_csrw_i128(cpu_env, csr, srcl, srch);
     return do_csr_post(ctx);
 }
@@ -922,6 +943,7 @@ static bool do_csrrw_i128(DisasContext *ctx, int rd, int rc,
     TCGv_i32 csr = tcg_constant_i32(rc);
 
     translator_io_start(&ctx->base);
+    gen_dasics_csr_write_check(ctx);
     gen_helper_csrrw_i128(destl, cpu_env, csr, srcl, srch, maskl, maskh);
     tcg_gen_ld_tl(desth, cpu_env, offsetof(CPURISCVState, retxh));
     gen_set_gpr128(ctx, rd, destl, desth);
