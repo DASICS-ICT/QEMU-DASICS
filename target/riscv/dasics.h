@@ -4,11 +4,11 @@
 #define MCFG_CSFT   0x200ul
 #define MCFG_CSLT   0x100ul
 #define MCFG_CSST   0x80ul
-#define MCFG_CSET   0x40ul
+#define MCFG_CSET   0x40ul /* Legacy bit; ECALL bypass disabled. */
 #define MCFG_CUFT   0x20ul
 #define MCFG_CULT   0x10ul
 #define MCFG_CUST   0x8ul
-#define MCFG_CUET   0x4ul
+#define MCFG_CUET   0x4ul  /* Legacy bit; ECALL bypass disabled. */
 #define MCFG_UENA   0x2ul
 #define MCFG_SENA   0x1ul
 

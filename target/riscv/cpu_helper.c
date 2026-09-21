@@ -1695,14 +1695,16 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             } else if (env->priv == PRV_U) {
                 cause = RISCV_EXCP_U_ECALL;
             }
-            /* check whether this ecall comes from untrusted zone */
-            bool is_trusted = dasics_in_trusted_zone(env, env->pc);
-            bool untrusted_u = env->priv == PRV_U && !is_trusted && !(env->dasics_state.maincfg & MCFG_CUET);
-            bool untrusted_s = env->priv == PRV_S && !is_trusted && !(env->dasics_state.maincfg & MCFG_CSET);
-            cause = (untrusted_s) ? RISCV_EXCP_DASICS_S_CHECK_FAULT :
-                    (untrusted_u) ? RISCV_EXCP_DASICS_U_CHECK_FAULT :
-                                    cause;            
-            if (untrusted_s || untrusted_u) env->dasics_state.dfreason = DFR_EF;
+            /* Untrusted ECALLs must go through a trusted service gate. */
+            bool is_trusted = !riscv_cpu_cfg(env)->dasics ||
+                              dasics_in_trusted_zone(env, env->pc);
+            bool untrusted_u = env->priv == PRV_U && !is_trusted;
+            bool untrusted_s = env->priv == PRV_S && !is_trusted;
+            if (untrusted_s || untrusted_u) {
+                cause = untrusted_s ? RISCV_EXCP_DASICS_S_CHECK_FAULT :
+                                      RISCV_EXCP_DASICS_U_CHECK_FAULT;
+                env->dasics_state.dfreason = DFR_EF;
+            }
         }
     }
 

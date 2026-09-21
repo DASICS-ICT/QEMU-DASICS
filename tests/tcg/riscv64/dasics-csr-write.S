@@ -17,7 +17,7 @@
     .equ DLLO, 0x890
     .equ DLHI, 0x891
 
-/* Enter a test in S/U mode, returning to M-mode on ECALL. */
+/* Enter a test in S/U mode, returning to M-mode on EBREAK. */
     .macro enter label, privilege=0x800
     la s10, 991f
     la t0, \label
@@ -111,8 +111,7 @@ _start:
     csrw DSMLO, t0
     la t0, allowed_end
     csrw DSMHI, t0
-    /* Allow untrusted S-mode ECALLs to return to the M-mode harness. */
-    li t0, 0x41
+    li t0, 1
     csrw DSMCFG, t0
     enter allowed
 
@@ -123,7 +122,7 @@ _start:
     enter allowed
 
     /* SENA on does not restrict U-mode (UENA is off). */
-    li t0, 0x41
+    li t0, 1
     csrw DSMCFG, t0
     enter user_allowed, 0
 
@@ -167,9 +166,7 @@ _start:
     .balign 4
 m_trap:
     csrr t0, mcause
-    li t1, 8
-    beq t0, t1, m_return
-    li t1, 9
+    li t1, 3
     beq t0, t1, m_return
     li t1, 2
     bne t0, t1, m_fail
@@ -229,7 +226,7 @@ allowed:
     li t0, 1
     bne a4, t0, s_fail
     li a0, 0
-    ecall
+    ebreak
 allowed_end:
 
 user_allowed:
@@ -238,7 +235,7 @@ user_allowed:
     li t0, 1
     bne a4, t0, s_fail
     li a0, 0
-    ecall
+    ebreak
 
 untrusted:
     deny_matrix sstatus
@@ -264,7 +261,7 @@ untrusted:
     csrr a4, cycle
     csrr a4, instret
     li a0, 0
-    ecall
+    ebreak
 
 hs_untrusted:
     deny_matrix hstatus
@@ -272,7 +269,7 @@ hs_untrusted:
     deny_matrix hgatp
     deny_matrix htimedelta
     li a0, 0
-    ecall
+    ebreak
 
 boundary_out:
     csrr s3, sscratch
@@ -287,7 +284,7 @@ boundary_out_csr:
     csrr a4, sscratch
     bne a4, s3, s_fail
     li a0, 0
-    ecall
+    ebreak
 
 boundary_in:
     li a3, 2
@@ -297,7 +294,7 @@ boundary_in_csr:
     csrr a4, sscratch
     bne a4, a3, s_fail
     li a0, 0
-    ecall
+    ebreak
 boundary_in_end:
 
 sweep:
@@ -311,11 +308,11 @@ sweep_start:
     .endr
 sweep_end:
     li a0, 0
-    ecall
+    ebreak
 
 s_fail:
     li a0, 1
-    ecall
+    ebreak
     j .
 
     .data

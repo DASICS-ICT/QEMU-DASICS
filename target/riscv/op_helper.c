@@ -261,8 +261,22 @@ void helper_cbo_inval(CPURISCVState *env, target_ulong address)
 
 #ifndef CONFIG_USER_ONLY
 
-target_ulong helper_uret(CPURISCVState *env)
+static void check_dasics_trusted_instruction(CPURISCVState *env,
+                                            target_ulong pc, uintptr_t ra)
 {
+    if (riscv_cpu_cfg(env)->dasics && !dasics_in_trusted_zone(env, pc)) {
+        riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, ra);
+    }
+}
+
+target_ulong helper_uret(CPURISCVState *env, target_ulong pc)
+{
+    /* KDASICS reserves URET for trusted user-mode trap handlers. */
+    if (riscv_cpu_cfg(env)->dasics && env->priv != PRV_U) {
+        riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+    }
+    check_dasics_trusted_instruction(env, pc, GETPC());
+
     target_ulong retpc = env->uepc;
 
     if (!riscv_has_ext(env, RVC) && (retpc & 0x3)) {
@@ -278,7 +292,7 @@ target_ulong helper_uret(CPURISCVState *env)
     return retpc;
 }
 
-target_ulong helper_sret(CPURISCVState *env)
+target_ulong helper_sret(CPURISCVState *env, target_ulong pc)
 {
     uint64_t mstatus;
     target_ulong prev_priv, prev_virt;
@@ -286,6 +300,8 @@ target_ulong helper_sret(CPURISCVState *env)
     if (!(env->priv >= PRV_S)) {
         riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
     }
+
+    check_dasics_trusted_instruction(env, pc, GETPC());
 
     target_ulong retpc = env->sepc;
     if (!riscv_has_ext(env, RVC) && (retpc & 0x3)) {
@@ -379,12 +395,14 @@ target_ulong helper_mret(CPURISCVState *env)
 
 
 
-void helper_wfi(CPURISCVState *env)
+void helper_wfi(CPURISCVState *env, target_ulong pc)
 {
     CPUState *cs = env_cpu(env);
     bool rvs = riscv_has_ext(env, RVS);
     bool prv_u = env->priv == PRV_U;
     bool prv_s = env->priv == PRV_S;
+
+    check_dasics_trusted_instruction(env, pc, GETPC());
 
     if (((prv_s || (!rvs && prv_u)) && get_field(env->mstatus, MSTATUS_TW)) ||
         (rvs && prv_u && !env->virt_enabled)) {

@@ -32,5 +32,22 @@ run-dasics-csr-write-no-h: dasics-csr-write
 	$(call run-test, $<, $(QEMU) $(DASICS_QEMU_OPTS) \
 		-cpu rv64$(COMMA)v=true$(COMMA)h=false -kernel $<)
 
+EXTRA_TESTS += dasics-privileged dasics-privileged-disabled
+dasics-privileged.o: CFLAGS += -march=rv64gc -mabi=lp64d -fno-pie
+dasics-privileged-disabled.o: $(TEST_SRC)/dasics-privileged.S
+	$(CC) $(CFLAGS) -march=rv64gc -mabi=lp64d -fno-pie \
+		-DNO_DASICS -c $< -o $@
+EXTRA_RUNS += run-dasics-privileged run-dasics-privileged-no-h
+EXTRA_RUNS += run-dasics-privileged-disabled
+run-dasics-privileged: dasics-privileged
+	$(call run-test, $<, $(QEMU) $(DASICS_QEMU_OPTS) \
+		-cpu rv64$(COMMA)svinval=true$(COMMA)h=true -kernel $<)
+run-dasics-privileged-no-h: dasics-privileged
+	$(call run-test, $<, $(QEMU) $(DASICS_QEMU_OPTS) \
+		-cpu rv64$(COMMA)svinval=true$(COMMA)h=false -kernel $<)
+run-dasics-privileged-disabled: dasics-privileged-disabled
+	$(call run-test, $<, $(QEMU) $(DASICS_QEMU_OPTS) \
+		-cpu rv64$(COMMA)svinval=true$(COMMA)dasics=false -kernel $<)
+
 # We don't currently support the multiarch system tests
 undefine MULTIARCH_TESTS

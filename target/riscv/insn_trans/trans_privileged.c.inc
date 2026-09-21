@@ -70,10 +70,12 @@ static bool trans_ebreak(DisasContext *ctx, arg_ebreak *a)
 static bool trans_uret(DisasContext *ctx, arg_uret *a)
 {
 #ifndef CONFIG_USER_ONLY
-    tcg_gen_movi_tl(cpu_pc, ctx->base.pc_next);
-
     if (has_ext(ctx, RVN)) {
-        gen_helper_uret(cpu_pc, cpu_env);
+        TCGv pc = tcg_temp_new();
+
+        gen_pc_plus_diff(pc, ctx, 0);
+        decode_save_opc(ctx);
+        gen_helper_uret(cpu_pc, cpu_env, pc);
         exit_tb(ctx); /* no chaining */
         ctx->base.is_jmp = DISAS_NORETURN;
     } else {
@@ -89,9 +91,12 @@ static bool trans_sret(DisasContext *ctx, arg_sret *a)
 {
 #ifndef CONFIG_USER_ONLY
     if (has_ext(ctx, RVS)) {
+        TCGv pc = tcg_temp_new();
+
+        gen_pc_plus_diff(pc, ctx, 0);
         decode_save_opc(ctx);
         translator_io_start(&ctx->base);
-        gen_helper_sret(cpu_pc, cpu_env);
+        gen_helper_sret(cpu_pc, cpu_env, pc);
         exit_tb(ctx); /* no chaining */
         ctx->base.is_jmp = DISAS_NORETURN;
     } else {
@@ -120,9 +125,12 @@ static bool trans_mret(DisasContext *ctx, arg_mret *a)
 static bool trans_wfi(DisasContext *ctx, arg_wfi *a)
 {
 #ifndef CONFIG_USER_ONLY
+    TCGv pc = tcg_temp_new();
+
+    gen_pc_plus_diff(pc, ctx, 0);
     decode_save_opc(ctx);
     gen_update_pc(ctx, ctx->cur_insn_len);
-    gen_helper_wfi(cpu_env);
+    gen_helper_wfi(cpu_env, pc);
     return true;
 #else
     return false;
