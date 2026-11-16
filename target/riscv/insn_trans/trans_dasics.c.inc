@@ -3,9 +3,10 @@ static bool trans_dasicscallj(DisasContext *ctx, arg_dasicscallj *a)
 {
     TCGLabel *misaligned = NULL;
     TCGv target_pc = tcg_temp_new();
-    TCGv succ_pc = dest_gpr(ctx, (int)1);  
+    /* A fault must not commit the link register before the checks below. */
+    TCGv succ_pc = tcg_temp_new();
 
-    tcg_gen_addi_tl(target_pc, get_gpr(ctx, (int)0, EXT_NONE), a->imm);
+    gen_pc_plus_diff(target_pc, ctx, a->imm);
     tcg_gen_andi_tl(target_pc, target_pc, (target_ulong)-2);
 
     if (get_xl(ctx) == MXL_RV32) {
@@ -51,8 +52,10 @@ static bool trans_dasicscalljr(DisasContext *ctx, arg_dasicscalljr *a)
 {
     TCGLabel *misaligned = NULL;
     TCGv target_pc = tcg_temp_new();
-    TCGv succ_pc = dest_gpr(ctx, (int)1);
+    /* Keep nextpc independent of rd, including x0 and an alias of rs1. */
+    TCGv succ_pc = tcg_temp_new();
 
+    /* Read the old rs1 before a successful call writes the return address. */
     tcg_gen_addi_tl(target_pc, get_gpr(ctx, a->rs1, EXT_NONE), a->imm);
     tcg_gen_andi_tl(target_pc, target_pc, (target_ulong)-2);
 
@@ -79,7 +82,7 @@ static bool trans_dasicscalljr(DisasContext *ctx, arg_dasicscalljr *a)
 
 #endif
 
-    gen_set_gpr(ctx, (int)1, succ_pc);
+    gen_set_gpr(ctx, a->rd, succ_pc);
 
     tcg_gen_mov_tl(cpu_pc, target_pc);
     lookup_and_goto_ptr(ctx);
